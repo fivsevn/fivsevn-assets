@@ -1,5 +1,9 @@
 待整理。以下是整理规则备忘。
 
+# Avatar Assets
+
+This folder contains personal avatar images used across different platforms and contexts.
+
 ---
 
 ## File Format Guidelines
