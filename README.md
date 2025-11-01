@@ -2,7 +2,6 @@
 A repository for storing images and assets used in my blog: fivsevn.home.blog
 
 ---
-
 ## structure
   
 ```
@@ -39,7 +38,12 @@ assets/
 ```
 
 ---
+## in progress
 
+- `/202503`等文件夹合并到`/blog`。需更改图片引用链接。
+- `/homepage`图片待更新设计.
+
+---
 ## update log
 > Newest entries appear at the top.  
 
