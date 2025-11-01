@@ -1,4 +1,4 @@
-待整理。以下是整理规则备忘。
+状态：待整理。
 
 # Avatar Assets
 
@@ -30,9 +30,18 @@ Recommended DPI: **72–96** (for web display)
 ---
 
 ## Naming Convention
-- `main-<size>.ext` → Primary avatar images (e.g., `main-512.webp`)  
-- `thumbnail-<size>.ext` → Small variants or icons  
-- Avoid spaces, uppercase letters, or platform-specific names like `github-avatar.jpg`.
+- File names follow the pattern:  
+  **`<section><YYYYMM><descriptor><size>.<ext>`**
+  - Example: `homepage202506banner1200.webp`
+- Elements:
+  - **section** → folder or page name (`homepage`, `avatar`, `links`, etc.)  
+  - **YYYYMM** → export batch or update timestamp (e.g., `202506`)  
+  - **descriptor** → content type (`banner`, `cover`, `bg`, `logo`)  
+  - **size** → primary width indicator (optional but useful)
+- Use only lowercase letters and digits; no spaces or underscores.
+
+> <模块><年月><描述><尺寸>  
+> 示例：avatar202506main512.jpg、homepage202506banner1200.webp。  
 
 ---
 
