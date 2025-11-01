@@ -5,7 +5,7 @@ A repository for storing images and assets used in my blog: fivsevn.home.blog
 ## structure
   
 ```
-assets/  
+fivsevn-assets/  
 ├── blog/  
 │   ├── 2026/  
 │   │   ├── 202601/  
