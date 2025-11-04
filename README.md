@@ -5,38 +5,38 @@ A repository for storing images and assets used in my blog: fivsevn.home.blog
 ## structure
   
 ```
-fivsevn-assets/  
-├── blog/  
-│   ├── 2026/  
-│   │   ├── 202601/  
-│   │   │   ├── xxx.jpg  
-│   │   │   ├── xxx.webp  
-│   │   └──  202602/  
-│   │       ├── xxx.webp  
-│   │       └── xxx.png  
-│   ├── 2025/  
-│   │   ├── 202503/  
-│   │   │   ├── xxx.webp  
-│   │   │   └── xxx.png  
-│   │   └── 202507/  
-│   │       └── xxx.webp  
-├── homepage/  
-│   ├── homepage20251101feed.webp  
-│   ├── homepage20251101links.webp  
-│   └── homepage20251205xxx.png  
-├── avatar/  
-│   ├── avatar202506.webp  
-│   ├── avatar202506dev.webp  
-│   └── avatar202507.png  
+fivsevn-assets/
+├── blog/
+│   ├── 2026/
+│   │   ├── 202601/
+│   │   │   ├── xxx.jpg
+│   │   │   ├── xxx.webp
+│   │   └── 202602/
+│   │       ├── xxx.webp
+│   │       └── xxx.png
+│   ├── 2025/
+│   │   ├── 202503/
+│   │   │   ├── xxx.webp
+│   │   │   └── xxx.png
+│   │   └── 202507/
+│   │       └── xxx.webp
+├── homepage/
+│   ├── homepage20251101feed.webp
+│   ├── homepage20251101links.webp
+│   └── homepage20251205xxx.png
+├── avatar/
+│   ├── avatar202506.webp
+│   ├── avatar202506dev.webp
+│   └── avatar202507.png
 └── common/
-    ├── pngcutouts/  
-    │   ├── xxx.png  
-    │   └── xxx.png 
-    ├── icons/  
-    │   ├── xxx.svg  
+    ├── pngcutouts/
+    │   ├── xxx.png
     │   └── xxx.png
-    └── textures/  
-        ├── xxx.webp  
+    ├── icons/
+    │   ├── xxx.svg
+    │   └── xxx.png
+    └── textures/
+        ├── xxx.webp
         └── xxx.png
 ```
 
