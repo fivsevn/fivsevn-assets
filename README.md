@@ -28,10 +28,13 @@ fivsevn-assets/
 │   ├── avatar202506.webp  
 │   ├── avatar202506dev.webp  
 │   └── avatar202507.png  
-└── common/  
+└── common/
+    ├── pngcutouts/  
+    │   ├── xxx.png  
+    │   └── xxx.png 
     ├── icons/  
     │   ├── xxx.svg  
-    │   ├── xxx.svg  
+    │   └── xxx.png
     └── textures/  
         ├── xxx.webp  
         └── xxx.png
