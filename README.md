@@ -11,9 +11,9 @@ fivsevn-assets/
 │   │   ├── 202601/  
 │   │   │   ├── xxx.jpg  
 │   │   │   ├── xxx.webp  
-│   │   ├── 202602/  
-│   │   │   ├── xxx.webp  
-│   │   │   └── xxx.png  
+│   │   └──  202602/  
+│   │       ├── xxx.webp  
+│   │       └── xxx.png  
 │   ├── 2025/  
 │   │   ├── 202503/  
 │   │   │   ├── xxx.webp  
