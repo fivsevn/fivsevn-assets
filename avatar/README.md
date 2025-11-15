@@ -1,5 +1,3 @@
-状态：待整理。
-
 # Avatar Assets
 
 This folder contains personal avatar images used across different platforms and contexts.
