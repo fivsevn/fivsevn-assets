@@ -1,3 +1,7 @@
+待办：
+- 1024原图待补。
+- 头像可考虑更新。
+
 # Avatar Assets
 
 This folder contains personal avatar images used across different platforms and contexts.
