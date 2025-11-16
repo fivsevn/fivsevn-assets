@@ -8,43 +8,44 @@ A repository for storing images and assets used in my blog: fivsevn.home.blog
 fivsevn-assets/
 ├── blog/
 │   ├── 2026/
-│   │   ├── 202601/
+│   │   ├── 202602/
+│   │   │   ├── ...
 │   │   │   ├── xxx.jpg
 │   │   │   ├── xxx.webp
-│   │   └── 202602/
-│   │       ├── xxx.webp
+│   │   └── 202601/
+│   │       ├── ...
 │   │       └── xxx.png
 │   ├── 2025/
-│   │   ├── 202503/
-│   │   │   ├── xxx.webp
-│   │   │   └── xxx.png
-│   │   └── 202507/
-│   │       └── xxx.webp
+│   │   ├── 202504/
+│   │   │   ├── ...
+│   │   │   ├── 20250408streetlight.mp4
+│   │   │   └── 20250403pigpdevlog.jpeg
+│   │   └── 202503/
+│   │       ├── ...
+│   │       └── 20250331corpus.jpeg
 ├── homepage/
-│   ├── homepage20251101feed.webp
-│   ├── homepage20251101links.webp
-│   └── homepage20251205xxx.png
+│   ├── ...
+│   ├── homepage20251101head.webp
+│   ├── homepage20251101nvesvif.webp
+│   └── homepage20251105bio.webp
 ├── avatar/
-│   ├── avatar202506.webp
-│   ├── avatar202506dev.webp
-│   └── avatar202507.png
-└── common/
-    ├── pngcutouts/
-    │   ├── xxx.png
-    │   └── xxx.png
-    ├── icons/
-    │   ├── xxx.svg
-    │   └── xxx.png
-    └── textures/
-        ├── xxx.webp
-        └── xxx.png
+│   ├── ...
+│   ├── avatar202511dev512.png
+│   ├── avatar202511main512.png
+│   └── avatar202511nvesvif512.png
+└── pages/
+    ├── ???/
+    │   ├── ...
+    │   └── ...
+    └── ???/
+        ├── ...
+        └── ...
 ```
 
 ---
 ## in progress
 
 - `/202503`等文件夹合并到`/blog`。需更改图片引用链接。
-- `/homepage`图片待更新设计.
 
 ---
 ## update log
