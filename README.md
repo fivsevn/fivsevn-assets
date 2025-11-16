@@ -6,7 +6,7 @@ A repository for storing images and assets used in my blog: fivsevn.home.blog
   
 ```
 fivsevn-assets/
-├── blog/
+├── post/
 │   ├── 2026/
 │   │   ├── 202602/
 │   │   │   ├── ...
@@ -45,7 +45,7 @@ fivsevn-assets/
 ---
 ## in progress
 
-- 文件夹`/202503`、`/202503`转移到`/blog/2025`。需更改博客图片的引用链接。
+- 文件夹`/202503`、`/202503`转移到`/post/2025`。需更改博客图片的引用链接。
 
 ---
 ## update log
