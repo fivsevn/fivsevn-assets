@@ -43,11 +43,6 @@ fivsevn-assets/
 ```
 
 ---
-## in progress
-
-- 文件夹`/2025-04`、`/2025-03`转移到`/post/2025`。需更改博客图片的引用链接。
-
----
 ## update log
 > Newest entries appear at the top.  
 
