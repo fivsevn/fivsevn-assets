@@ -1,5 +1,12 @@
 # fivsevn-assets
+
 A repository for storing images and assets used in my blog: fivsevn.home.blog
+
+---
+## update log
+
+- 2025.11.01 重构一下库库
+- 2025.03.29 我崭新的库库
 
 ---
 ## structure
@@ -42,9 +49,4 @@ fivsevn-assets/
         └── ...
 ```
 
----
-## update log
-> Newest entries appear at the top.  
 
-- **20251101** 重构一下库库
-- **20250329** 我崭新的库库
