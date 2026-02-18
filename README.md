@@ -1,6 +1,6 @@
 # fivsevn-assets
 
-A repository for storing images and assets used in my blog: fivsevn.home.blog
+A repository for storing images and assets used in my blog: fivsevn.com
 
 ---
 ## update log
