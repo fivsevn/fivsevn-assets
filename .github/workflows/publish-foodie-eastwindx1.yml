@@ -1,0 +1,40 @@
+name: Publish Foodie Eastwindx1
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "foodie/eastwindx1/**"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Publish new foodie photos
+        env:
+          WP_BASE_URL: ${{ secrets.WP_BASE_URL }}
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          TITLE_TIMEZONE: ${{ secrets.TITLE_TIMEZONE }}
+          GITHUB_BEFORE: ${{ github.event.before }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: python scripts/publish_foodie_eastwindx1.py
