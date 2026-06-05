@@ -13,8 +13,8 @@ TARGET_DIR = "foodie/eastwindx1"
 CATEGORY_SLUG = "foodie"
 TAG_NAMES = ["daily", "东风一只"]
 
-# foodie 页面里旧图视觉上更接近 260px 左右。
-IMAGE_SIZE_PX = 260
+# 280px：比 260 稍大，并且更接近 foodie 卡片里左右灰边均等的效果。
+IMAGE_SIZE_PX = 280
 
 
 def env(name: str) -> str:
@@ -168,7 +168,7 @@ def make_square_image_block(image_url: str, title: str) -> str:
     size = IMAGE_SIZE_PX
 
     return f'''<!-- wp:html -->
-<div class="foodie-photo-square" style="width:{size}px; height:{size}px; max-width:100%; overflow:hidden; margin:0;">
+<div class="foodie-photo-square" style="width:{size}px; height:{size}px; max-width:100%; overflow:hidden; margin:0 auto;">
   <img
     src="{image_url}"
     alt="{title}"
