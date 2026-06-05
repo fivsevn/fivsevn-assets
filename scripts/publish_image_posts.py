@@ -10,13 +10,35 @@ import requests
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
-CATEGORY_SLUG = "foodie"
-
-
-FOODIE_TARGETS = {
-    "foodie/eastwindx1": ["daily", "东风一只bowl"],
-    "foodie/byme": ["daily", "史诗级大厨"],
-    "foodie/nothomecooked": ["daily"],
+# 不同目录对应不同 WordPress 分类、tags、图片 class。
+# category_slug 对应 WordPress 后台里的 slug。
+# image_class 为空时，不额外加 class，走 WordPress 默认 image block 样式。
+TARGETS = {
+    "foodie/eastwindx1": {
+        "category_slug": "foodie",
+        "tags": ["daily", "东风一只bowl"],
+        "image_class": "foodie-photo-square",
+    },
+    "foodie/byme": {
+        "category_slug": "foodie",
+        "tags": ["daily", "史诗级大厨"],
+        "image_class": "foodie-photo-square",
+    },
+    "foodie/nothomecooked": {
+        "category_slug": "foodie",
+        "tags": ["daily"],
+        "image_class": "foodie-photo-square",
+    },
+    "natsci/fieldlog": {
+        "category_slug": "fieldlog",
+        "tags": [],
+        "image_class": "",
+    },
+    "post/stream": {
+        "category_slug": "stream",
+        "tags": [],
+        "image_class": "",
+    },
 }
 
 
@@ -56,17 +78,14 @@ def is_target_image(path: str) -> bool:
     if not p.is_file():
         return False
 
-    return any(
-        path.startswith(f"{target_dir}/")
-        for target_dir in FOODIE_TARGETS.keys()
-    )
+    return any(path.startswith(f"{target_dir}/") for target_dir in TARGETS.keys())
 
 
 def get_changed_images() -> list[str]:
     before = os.environ.get("GITHUB_BEFORE", "").strip()
     after = os.environ.get("GITHUB_SHA", "HEAD").strip()
 
-    target_dirs = list(FOODIE_TARGETS.keys())
+    target_dirs = list(TARGETS.keys())
 
     if not before or before == "0000000000000000000000000000000000000000":
         candidates = []
@@ -96,26 +115,21 @@ def get_changed_images() -> list[str]:
             path = parts[-1]
             candidates.append(path)
 
-    images = [
-        path
-        for path in candidates
-        if is_target_image(path)
-    ]
-
+    images = [path for path in candidates if is_target_image(path)]
     return sorted(set(images))
 
 
 def get_target_dir_for_path(path: str) -> str:
-    for target_dir in FOODIE_TARGETS.keys():
+    for target_dir in TARGETS.keys():
         if path.startswith(f"{target_dir}/"):
             return target_dir
 
-    raise RuntimeError(f"No foodie target config found for path: {path}")
+    raise RuntimeError(f"No target config found for path: {path}")
 
 
-def get_tag_names_for_path(path: str) -> list[str]:
+def get_config_for_path(path: str) -> dict:
     target_dir = get_target_dir_for_path(path)
-    return FOODIE_TARGETS[target_dir]
+    return TARGETS[target_dir]
 
 
 def get_file_commit_time(path: str) -> datetime:
@@ -176,7 +190,7 @@ def make_post_slug(path: str) -> str:
         .replace("_", "-")
         .replace(".", "-")
     )
-    return f"foodie-{safe}"
+    return f"asset-{safe}"
 
 
 def post_already_exists(slug: str) -> bool:
@@ -195,14 +209,20 @@ def make_image_url(path: str) -> str:
     return f"{CDN_BASE_URL}/{path}"
 
 
-def make_image_block(image_url: str, title: str) -> str:
+def make_image_block(image_url: str, title: str, image_class: str) -> str:
     escaped_url = html.escape(image_url, quote=True)
     escaped_title = html.escape(title, quote=True)
+    escaped_class = html.escape(image_class, quote=True)
 
-    # WordPress 原生 Image block。
-    # 图片尺寸由 WordPress Additional CSS 里的 .foodie-photo-square 控制。
-    return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none","className":"foodie-photo-square"}} -->
-<figure class="wp-block-image foodie-photo-square">
+    if image_class:
+        return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none","className":"{escaped_class}"}} -->
+<figure class="wp-block-image {escaped_class}">
+  <img src="{escaped_url}" alt="{escaped_title}" />
+</figure>
+<!-- /wp:image -->'''
+
+    return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none"}} -->
+<figure class="wp-block-image">
   <img src="{escaped_url}" alt="{escaped_title}" />
 </figure>
 <!-- /wp:image -->'''
@@ -210,18 +230,28 @@ def make_image_block(image_url: str, title: str) -> str:
 
 def publish_image(
     path: str,
-    category_id: int,
+    category_cache: dict[str, int],
     tag_cache: dict[str, int],
 ) -> None:
+    config = get_config_for_path(path)
+
+    category_slug = config["category_slug"]
+    tag_names = config["tags"]
+    image_class = config["image_class"]
+
     dt = get_file_commit_time(path)
     title = format_title(dt)
     image_url = make_image_url(path)
     slug = make_post_slug(path)
-    tag_names = get_tag_names_for_path(path)
 
     if post_already_exists(slug):
         print(f"Skip existing post: {path}")
         return
+
+    if category_slug not in category_cache:
+        category_cache[category_slug] = get_category_id_by_slug(category_slug)
+
+    category_id = category_cache[category_slug]
 
     tag_ids = []
     for tag_name in tag_names:
@@ -229,7 +259,7 @@ def publish_image(
             tag_cache[tag_name] = get_or_create_tag_id(tag_name)
         tag_ids.append(tag_cache[tag_name])
 
-    content = make_image_block(image_url, title)
+    content = make_image_block(image_url, title, image_class)
 
     payload = {
         "status": "publish",
@@ -237,11 +267,17 @@ def publish_image(
         "slug": slug,
         "content": content,
         "categories": [category_id],
-        "tags": tag_ids,
     }
 
+    if tag_ids:
+        payload["tags"] = tag_ids
+
     post = wp_post("posts", payload)
-    print(f"Published: {path} -> {post.get('link')} with tags {tag_names}")
+
+    print(
+        f"Published: {path} -> {post.get('link')} "
+        f"category={category_slug} tags={tag_names}"
+    )
 
 
 def main() -> None:
@@ -251,11 +287,11 @@ def main() -> None:
         print("No new images found.")
         return
 
-    category_id = get_category_id_by_slug(CATEGORY_SLUG)
+    category_cache: dict[str, int] = {}
     tag_cache: dict[str, int] = {}
 
     for image in images:
-        publish_image(image, category_id, tag_cache)
+        publish_image(image, category_cache, tag_cache)
 
 
 if __name__ == "__main__":
