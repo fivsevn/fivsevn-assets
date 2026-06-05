@@ -13,8 +13,10 @@ TARGET_DIR = "foodie/eastwindx1"
 CATEGORY_SLUG = "foodie"
 TAG_NAMES = ["daily", "东风一只"]
 
-
-IMAGE_SIZE_CSS = "min(70vw, 275px)"
+# 响应式正方形尺寸：
+# 桌面端最多 273px；
+# 手机窄屏时按 60vw 自动缩小。
+IMAGE_SIZE_CSS = "min(60vw, 273px)"
 
 
 def env(name: str) -> str:
