@@ -1,4 +1,4 @@
-name: Publish Foodie Eastwindx1
+name: Publish Foodie Photos
 
 on:
   push:
@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - "foodie/eastwindx1/**"
+      - "foodie/byme/**"
+      - "foodie/nothomecooked/**"
 
 permissions:
   contents: read
@@ -28,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Publish new foodie photos
+      - name: Publish foodie photos
         env:
           WP_BASE_URL: ${{ secrets.WP_BASE_URL }}
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
@@ -37,4 +39,4 @@ jobs:
           TITLE_TIMEZONE: ${{ secrets.TITLE_TIMEZONE }}
           GITHUB_BEFORE: ${{ github.event.before }}
           GITHUB_SHA: ${{ github.sha }}
-        run: python scripts/publish_foodie_eastwindx1.py
+        run: python scripts/publish_foodie.py
