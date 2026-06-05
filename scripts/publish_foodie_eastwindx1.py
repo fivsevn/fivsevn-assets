@@ -13,8 +13,8 @@ TARGET_DIR = "foodie/eastwindx1"
 CATEGORY_SLUG = "foodie"
 TAG_NAMES = ["daily", "东风一只"]
 
-# 280px：比 260 稍大，并且更接近 foodie 卡片里左右灰边均等的效果。
-IMAGE_SIZE_PX = 280
+# 270px：260 偏小，280 偏大，取中间值。
+IMAGE_SIZE_PX = 270
 
 
 def env(name: str) -> str:
