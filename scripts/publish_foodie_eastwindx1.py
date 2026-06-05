@@ -13,6 +13,8 @@ TARGET_DIR = "foodie/eastwindx1"
 CATEGORY_SLUG = "foodie"
 TAG_NAMES = ["daily", "东风一只"]
 
+IMAGE_SIZE_PX = 420
+
 
 def env(name: str) -> str:
     value = os.environ.get(name, "").strip()
@@ -161,6 +163,21 @@ def make_image_url(path: str) -> str:
     return f"{CDN_BASE_URL}/{path}"
 
 
+def make_square_image_block(image_url: str, title: str) -> str:
+    size = IMAGE_SIZE_PX
+
+    return f'''<!-- wp:image {{"linkDestination":"none"}} -->
+<figure class="wp-block-image foodie-photo-square" style="width:{size}px; max-width:100%; margin:0 auto;">
+  <img
+    src="{image_url}"
+    alt="{title}"
+    loading="lazy"
+    style="width:{size}px; max-width:100%; aspect-ratio:1/1; height:auto; object-fit:cover; display:block;"
+  />
+</figure>
+<!-- /wp:image -->'''
+
+
 def publish_image(path: str, category_id: int, tag_ids: list[int]) -> None:
     dt = get_file_commit_time(path)
     title = format_title(dt)
@@ -171,9 +188,7 @@ def publish_image(path: str, category_id: int, tag_ids: list[int]) -> None:
         print(f"Skip existing post: {path}")
         return
 
-    # 测试 Markdown 插图。
-    # 如果 WordPress/Jetpack 没有解析 Markdown，文章里会显示原始 ![](...) 文本。
-    content = f"![{title}]({image_url})"
+    content = make_square_image_block(image_url, title)
 
     payload = {
         "status": "publish",
