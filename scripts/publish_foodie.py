@@ -12,10 +12,9 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 CATEGORY_SLUG = "foodie"
 
-# 不同 foodie 子目录对应不同 tags。
-# daily 是默认 tag，每个目录都会加。
+
 FOODIE_TARGETS = {
-    "foodie/eastwindx1": ["daily", "东风一只"],
+    "foodie/eastwindx1": ["daily", "东风一只bowl"],
     "foodie/byme": ["daily", "史诗级大厨"],
     "foodie/nothomecooked": ["daily"],
 }
