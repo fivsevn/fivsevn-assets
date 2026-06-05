@@ -13,8 +13,8 @@ TARGET_DIR = "foodie/eastwindx1"
 CATEGORY_SLUG = "foodie"
 TAG_NAMES = ["daily", "东风一只"]
 
-# foodie 页面里旧图视觉上大约 300px 左右。
-IMAGE_SIZE_PX = 300
+# foodie 页面里旧图视觉上更接近 260px 左右。
+IMAGE_SIZE_PX = 260
 
 
 def env(name: str) -> str:
