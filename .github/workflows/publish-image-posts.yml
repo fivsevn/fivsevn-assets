@@ -1,4 +1,4 @@
-name: Publish Foodie Photos
+name: Publish Image Posts
 
 on:
   push:
@@ -8,6 +8,8 @@ on:
       - "foodie/eastwindx1/**"
       - "foodie/byme/**"
       - "foodie/nothomecooked/**"
+      - "natsci/fieldlog/**"
+      - "post/stream/**"
 
 permissions:
   contents: read
@@ -30,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Publish foodie photos
+      - name: Publish image posts
         env:
           WP_BASE_URL: ${{ secrets.WP_BASE_URL }}
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
@@ -39,4 +41,4 @@ jobs:
           TITLE_TIMEZONE: ${{ secrets.TITLE_TIMEZONE }}
           GITHUB_BEFORE: ${{ github.event.before }}
           GITHUB_SHA: ${{ github.sha }}
-        run: python scripts/publish_foodie.py
+        run: python scripts/publish_image_posts.py
