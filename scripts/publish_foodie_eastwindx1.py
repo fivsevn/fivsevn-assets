@@ -1,4 +1,3 @@
-import base64
 import os
 import subprocess
 from datetime import datetime
@@ -92,7 +91,7 @@ def get_file_commit_time(path: str) -> datetime:
 
 
 def format_title(dt: datetime) -> str:
-    # 例：28 May, 2026 21:57
+    # 例：06 Jun, 2026 05:51
     return dt.strftime("%d %b, %Y %H:%M")
 
 
@@ -137,7 +136,6 @@ def get_or_create_tag_id(name: str) -> int:
 
 
 def make_post_slug(path: str) -> str:
-    # 用路径生成稳定 slug，避免同一张图重复发布时难以识别。
     safe = (
         path.lower()
         .replace("/", "-")
@@ -148,7 +146,14 @@ def make_post_slug(path: str) -> str:
 
 
 def post_already_exists(slug: str) -> bool:
-    items = wp_get("posts", {"slug": slug, "status": "publish,draft,private", "per_page": 10})
+    items = wp_get(
+        "posts",
+        {
+            "slug": slug,
+            "status": "publish,draft,private",
+            "per_page": 10,
+        },
+    )
     return bool(items)
 
 
@@ -166,15 +171,15 @@ def publish_image(path: str, category_id: int, tag_ids: list[int]) -> None:
         print(f"Skip existing post: {path}")
         return
 
-    html = f'''<figure class="foodie-photo">
-  <img src="{image_url}" alt="{title}" loading="lazy">
-</figure>'''
+    # 测试 Markdown 插图。
+    # 如果 WordPress/Jetpack 没有解析 Markdown，文章里会显示原始 ![](...) 文本。
+    content = f"![{title}]({image_url})"
 
     payload = {
         "status": "publish",
         "title": title,
         "slug": slug,
-        "content": html,
+        "content": content,
         "categories": [category_id],
         "tags": tag_ids,
     }
