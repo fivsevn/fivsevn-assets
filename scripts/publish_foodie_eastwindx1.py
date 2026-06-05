@@ -13,7 +13,8 @@ TARGET_DIR = "foodie/eastwindx1"
 CATEGORY_SLUG = "foodie"
 TAG_NAMES = ["daily", "东风一只"]
 
-IMAGE_SIZE_PX = 420
+# foodie 页面里旧图视觉上大约 300px 左右。
+IMAGE_SIZE_PX = 300
 
 
 def env(name: str) -> str:
@@ -166,16 +167,16 @@ def make_image_url(path: str) -> str:
 def make_square_image_block(image_url: str, title: str) -> str:
     size = IMAGE_SIZE_PX
 
-    return f'''<!-- wp:image {{"linkDestination":"none"}} -->
-<figure class="wp-block-image foodie-photo-square" style="width:{size}px; max-width:100%; margin:0 auto;">
+    return f'''<!-- wp:html -->
+<div class="foodie-photo-square" style="width:{size}px; height:{size}px; max-width:100%; overflow:hidden; margin:0;">
   <img
     src="{image_url}"
     alt="{title}"
     loading="lazy"
-    style="width:{size}px; max-width:100%; aspect-ratio:1/1; height:auto; object-fit:cover; display:block;"
+    style="width:{size}px; height:{size}px; max-width:100%; object-fit:cover; display:block;"
   />
-</figure>
-<!-- /wp:image -->'''
+</div>
+<!-- /wp:html -->'''
 
 
 def publish_image(path: str, category_id: int, tag_ids: list[int]) -> None:
