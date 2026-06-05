@@ -1,3 +1,4 @@
+import html
 import os
 import subprocess
 from datetime import datetime
@@ -12,11 +13,6 @@ TARGET_DIR = "foodie/eastwindx1"
 
 CATEGORY_SLUG = "foodie"
 TAG_NAMES = ["daily", "东风一只"]
-
-# 响应式正方形尺寸：
-# 桌面端最多 273px；
-# 手机窄屏时按 54vw 自动缩小。
-IMAGE_SIZE_CSS = "min(54vw, 273px)"
 
 
 def env(name: str) -> str:
@@ -166,19 +162,17 @@ def make_image_url(path: str) -> str:
     return f"{CDN_BASE_URL}/{path}"
 
 
-def make_square_image_block(image_url: str, title: str) -> str:
-    size = IMAGE_SIZE_CSS
+def make_image_block(image_url: str, title: str) -> str:
+    escaped_url = html.escape(image_url, quote=True)
+    escaped_title = html.escape(title, quote=True)
 
-    return f'''<!-- wp:html -->
-<div class="foodie-photo-square" style="width:{size}; aspect-ratio:1/1; max-width:100%; overflow:hidden; margin:0 auto;">
-  <img
-    src="{image_url}"
-    alt="{title}"
-    loading="lazy"
-    style="width:100%; height:100%; object-fit:cover; display:block;"
-  />
-</div>
-<!-- /wp:html -->'''
+    # 这是 WordPress 原生 Image block，不是 Custom HTML block。
+    # 进入编辑器后应该会被识别为图片块。
+    return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none","className":"foodie-photo-square"}} -->
+<figure class="wp-block-image foodie-photo-square">
+  <img src="{escaped_url}" alt="{escaped_title}" />
+</figure>
+<!-- /wp:image -->'''
 
 
 def publish_image(path: str, category_id: int, tag_ids: list[int]) -> None:
@@ -191,7 +185,7 @@ def publish_image(path: str, category_id: int, tag_ids: list[int]) -> None:
         print(f"Skip existing post: {path}")
         return
 
-    content = make_square_image_block(image_url, title)
+    content = make_image_block(image_url, title)
 
     payload = {
         "status": "publish",
