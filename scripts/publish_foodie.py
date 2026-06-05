@@ -9,10 +9,16 @@ import requests
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-TARGET_DIR = "foodie/eastwindx1"
 
 CATEGORY_SLUG = "foodie"
-TAG_NAMES = ["daily", "东风一只"]
+
+# 不同 foodie 子目录对应不同 tags。
+# daily 是默认 tag，每个目录都会加。
+FOODIE_TARGETS = {
+    "foodie/eastwindx1": ["daily", "东风一只"],
+    "foodie/byme": ["daily", "史诗级大厨"],
+    "foodie/nothomecooked": ["daily"],
+}
 
 
 def env(name: str) -> str:
@@ -42,13 +48,32 @@ def run_git(args: list[str]) -> str:
     return result.stdout.strip()
 
 
+def is_target_image(path: str) -> bool:
+    p = Path(path)
+
+    if p.suffix.lower() not in IMAGE_EXTENSIONS:
+        return False
+
+    if not p.is_file():
+        return False
+
+    return any(
+        path.startswith(f"{target_dir}/")
+        for target_dir in FOODIE_TARGETS.keys()
+    )
+
+
 def get_changed_images() -> list[str]:
     before = os.environ.get("GITHUB_BEFORE", "").strip()
     after = os.environ.get("GITHUB_SHA", "HEAD").strip()
 
+    target_dirs = list(FOODIE_TARGETS.keys())
+
     if not before or before == "0000000000000000000000000000000000000000":
-        output = run_git(["ls-files", TARGET_DIR])
-        candidates = output.splitlines()
+        candidates = []
+        for target_dir in target_dirs:
+            output = run_git(["ls-files", target_dir])
+            candidates.extend(output.splitlines())
     else:
         output = run_git([
             "diff",
@@ -56,7 +81,7 @@ def get_changed_images() -> list[str]:
             before,
             after,
             "--",
-            TARGET_DIR,
+            *target_dirs,
         ])
 
         candidates = []
@@ -72,17 +97,26 @@ def get_changed_images() -> list[str]:
             path = parts[-1]
             candidates.append(path)
 
-    images = []
-    for path in candidates:
-        p = Path(path)
-        if (
-            str(path).startswith(f"{TARGET_DIR}/")
-            and p.suffix.lower() in IMAGE_EXTENSIONS
-            and p.is_file()
-        ):
-            images.append(str(p))
+    images = [
+        path
+        for path in candidates
+        if is_target_image(path)
+    ]
 
     return sorted(set(images))
+
+
+def get_target_dir_for_path(path: str) -> str:
+    for target_dir in FOODIE_TARGETS.keys():
+        if path.startswith(f"{target_dir}/"):
+            return target_dir
+
+    raise RuntimeError(f"No foodie target config found for path: {path}")
+
+
+def get_tag_names_for_path(path: str) -> list[str]:
+    target_dir = get_target_dir_for_path(path)
+    return FOODIE_TARGETS[target_dir]
 
 
 def get_file_commit_time(path: str) -> datetime:
@@ -166,8 +200,8 @@ def make_image_block(image_url: str, title: str) -> str:
     escaped_url = html.escape(image_url, quote=True)
     escaped_title = html.escape(title, quote=True)
 
-    # 这是 WordPress 原生 Image block，不是 Custom HTML block。
-    # 进入编辑器后应该会被识别为图片块。
+    # WordPress 原生 Image block。
+    # 图片尺寸由 WordPress Additional CSS 里的 .foodie-photo-square 控制。
     return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none","className":"foodie-photo-square"}} -->
 <figure class="wp-block-image foodie-photo-square">
   <img src="{escaped_url}" alt="{escaped_title}" />
@@ -175,15 +209,26 @@ def make_image_block(image_url: str, title: str) -> str:
 <!-- /wp:image -->'''
 
 
-def publish_image(path: str, category_id: int, tag_ids: list[int]) -> None:
+def publish_image(
+    path: str,
+    category_id: int,
+    tag_cache: dict[str, int],
+) -> None:
     dt = get_file_commit_time(path)
     title = format_title(dt)
     image_url = make_image_url(path)
     slug = make_post_slug(path)
+    tag_names = get_tag_names_for_path(path)
 
     if post_already_exists(slug):
         print(f"Skip existing post: {path}")
         return
+
+    tag_ids = []
+    for tag_name in tag_names:
+        if tag_name not in tag_cache:
+            tag_cache[tag_name] = get_or_create_tag_id(tag_name)
+        tag_ids.append(tag_cache[tag_name])
 
     content = make_image_block(image_url, title)
 
@@ -197,7 +242,7 @@ def publish_image(path: str, category_id: int, tag_ids: list[int]) -> None:
     }
 
     post = wp_post("posts", payload)
-    print(f"Published: {path} -> {post.get('link')}")
+    print(f"Published: {path} -> {post.get('link')} with tags {tag_names}")
 
 
 def main() -> None:
@@ -208,10 +253,10 @@ def main() -> None:
         return
 
     category_id = get_category_id_by_slug(CATEGORY_SLUG)
-    tag_ids = [get_or_create_tag_id(name) for name in TAG_NAMES]
+    tag_cache: dict[str, int] = {}
 
     for image in images:
-        publish_image(image, category_id, tag_ids)
+        publish_image(image, category_id, tag_cache)
 
 
 if __name__ == "__main__":
