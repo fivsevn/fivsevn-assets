@@ -35,7 +35,7 @@ TARGETS = {
         "image_class": "",
     },
     "post/stream": {
-        "category_slug": "stream",
+        "category_slug": "posts",
         "tags": [],
         "image_class": "",
     },
@@ -167,9 +167,27 @@ def wp_post(endpoint: str, payload: dict):
 
 def get_category_id_by_slug(slug: str) -> int:
     items = wp_get("categories", {"slug": slug, "per_page": 100})
-    if not items:
-        raise RuntimeError(f"Category not found: {slug}")
-    return int(items[0]["id"])
+    if items:
+        return int(items[0]["id"])
+
+    items = wp_get("categories", {"search": slug, "per_page": 100})
+
+    for item in items:
+        if item.get("slug") == slug:
+            return int(item["id"])
+
+    for item in items:
+        if item.get("name") == slug:
+            return int(item["id"])
+
+    available = [
+        f'{item.get("name")} ({item.get("slug")})'
+        for item in items
+    ]
+
+    raise RuntimeError(
+        f"Category not found: {slug}. Search results: {available}"
+    )
 
 
 def get_or_create_tag_id(name: str) -> int:
