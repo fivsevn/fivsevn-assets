@@ -13,8 +13,8 @@ TARGET_DIR = "foodie/eastwindx1"
 CATEGORY_SLUG = "foodie"
 TAG_NAMES = ["daily", "东风一只"]
 
-# 270px：260 偏小，280 偏大，取中间值。
-IMAGE_SIZE_PX = 270
+
+IMAGE_SIZE_CSS = "min(70vw, 275px)"
 
 
 def env(name: str) -> str:
@@ -165,15 +165,15 @@ def make_image_url(path: str) -> str:
 
 
 def make_square_image_block(image_url: str, title: str) -> str:
-    size = IMAGE_SIZE_PX
+    size = IMAGE_SIZE_CSS
 
     return f'''<!-- wp:html -->
-<div class="foodie-photo-square" style="width:{size}px; height:{size}px; max-width:100%; overflow:hidden; margin:0 auto;">
+<div class="foodie-photo-square" style="width:{size}; aspect-ratio:1/1; max-width:100%; overflow:hidden; margin:0 auto;">
   <img
     src="{image_url}"
     alt="{title}"
     loading="lazy"
-    style="width:{size}px; height:{size}px; max-width:100%; object-fit:cover; display:block;"
+    style="width:100%; height:100%; object-fit:cover; display:block;"
   />
 </div>
 <!-- /wp:html -->'''
