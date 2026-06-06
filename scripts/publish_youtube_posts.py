@@ -128,8 +128,8 @@ def post_already_exists(slug: str) -> bool:
 def make_youtube_embed_block(video_url: str) -> str:
     escaped_url = html.escape(video_url, quote=True)
 
-    return f'''<!-- wp:embed {{"url":"{escaped_url}","type":"video","providerNameSlug":"youtube","responsive":false,"className":"wp-embed-aspect-16-9 wp-has-aspect-ratio"}} -->
-<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube wp-embed-aspect-16-9 wp-has-aspect-ratio"><div class="wp-block-embed__wrapper">
+    return f'''<!-- wp:embed {{"url":"{escaped_url}","type":"video","providerNameSlug":"youtube","responsive":false}} -->
+<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube"><div class="wp-block-embed__wrapper">
 {escaped_url}
 </div></figure>
 <!-- /wp:embed -->'''
