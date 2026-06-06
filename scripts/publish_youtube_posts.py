@@ -24,6 +24,13 @@ WP_USERNAME = env("WP_USERNAME")
 WP_APP_PASSWORD = env("WP_APP_PASSWORD")
 YOUTUBE_CHANNEL_ID = env("YOUTUBE_CHANNEL_ID")
 
+if not YOUTUBE_CHANNEL_ID.startswith("UC"):
+    raise RuntimeError(
+        "YOUTUBE_CHANNEL_ID must be the UC... channel id only, "
+        "not a handle or URL. "
+        f"Current value starts with: {YOUTUBE_CHANNEL_ID[:30]}"
+    )
+
 AUTH = (WP_USERNAME, WP_APP_PASSWORD)
 
 
@@ -64,7 +71,19 @@ def get_latest_youtube_video() -> tuple[str, str]:
         "https://www.youtube.com/feeds/videos.xml"
         f"?channel_id={YOUTUBE_CHANNEL_ID}"
     )
+
+    print(f"YOUTUBE_CHANNEL_ID starts with: {YOUTUBE_CHANNEL_ID[:12]}...")
+    print(f"Feed URL: {feed_url}")
+
     feed = feedparser.parse(feed_url)
+
+    print(f"Feed status: {getattr(feed, 'status', 'unknown')}")
+    print(f"Feed bozo: {getattr(feed, 'bozo', 'unknown')}")
+    print(f"Feed href: {getattr(feed, 'href', 'unknown')}")
+    print(f"Feed entries count: {len(feed.entries)}")
+
+    if getattr(feed, "bozo", False):
+        print(f"Feed bozo exception: {getattr(feed, 'bozo_exception', 'unknown')}")
 
     if not feed.entries:
         raise RuntimeError("No YouTube videos found in feed.")
@@ -79,6 +98,9 @@ def get_latest_youtube_video() -> tuple[str, str]:
         if not match:
             raise RuntimeError(f"Could not find video id from link: {link}")
         video_id = match.group(1)
+
+    print(f"Latest video title: {title}")
+    print(f"Latest video id: {video_id}")
 
     return title, video_id
 
@@ -117,6 +139,9 @@ def main() -> None:
     title, video_id = get_latest_youtube_video()
     video_url = make_video_url(video_id)
     slug = make_post_slug(video_id)
+
+    print(f"Post slug: {slug}")
+    print(f"Video URL: {video_url}")
 
     if post_already_exists(slug):
         print(f"Skip existing YouTube post: {title} ({video_url})")
