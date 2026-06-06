@@ -7,8 +7,19 @@ import feedparser
 import requests
 
 
-# 固定发布到 WordPress 分类 slug：57storecctv
-CATEGORY_SLUG = "57storecctv"
+# 两个 YouTube 频道分别发布到不同 WordPress 分类。
+TARGETS = [
+    {
+        "name": "57store.fivsevn",
+        "channel_id_env": "YOUTUBE_57STORE_CHANNEL_ID",
+        "category_slug": "57storecctv",
+    },
+    {
+        "name": "fivsevn",
+        "channel_id_env": "YOUTUBE_FIVSEVN_CHANNEL_ID",
+        "category_slug": "motion",
+    },
+]
 
 
 def env(name: str) -> str:
@@ -21,14 +32,6 @@ def env(name: str) -> str:
 WP_BASE_URL = env("WP_BASE_URL")
 WP_USERNAME = env("WP_USERNAME")
 WP_APP_PASSWORD = env("WP_APP_PASSWORD")
-YOUTUBE_CHANNEL_ID = env("YOUTUBE_CHANNEL_ID")
-
-if not YOUTUBE_CHANNEL_ID.startswith("UC"):
-    raise RuntimeError(
-        "YOUTUBE_CHANNEL_ID must be the UC... channel id only, "
-        "not a handle or URL. "
-        f"Current value starts with: {YOUTUBE_CHANNEL_ID[:30]}"
-    )
 
 AUTH = (WP_USERNAME, WP_APP_PASSWORD)
 
@@ -57,6 +60,18 @@ def wp_post(endpoint: str, payload: dict):
     return response.json()
 
 
+def get_channel_id(target: dict) -> str:
+    channel_id = env(target["channel_id_env"])
+
+    if not channel_id.startswith("UC"):
+        raise RuntimeError(
+            f"{target['name']}: channel id must be the UC... id only, "
+            f"not a handle or URL. Current value starts with: {channel_id[:30]}"
+        )
+
+    return channel_id
+
+
 def get_category_id_by_slug(slug: str) -> int:
     items = wp_get("categories", {"slug": slug, "per_page": 100})
     if items:
@@ -65,22 +80,27 @@ def get_category_id_by_slug(slug: str) -> int:
     raise RuntimeError(f"Category not found by slug: {slug}")
 
 
-def get_latest_youtube_video() -> tuple[str, str]:
+def get_latest_youtube_video(channel_id: str, target_name: str) -> tuple[str, str]:
     feed_url = (
         "https://www.youtube.com/feeds/videos.xml"
-        f"?channel_id={YOUTUBE_CHANNEL_ID}"
+        f"?channel_id={channel_id}"
     )
 
     feed = feedparser.parse(feed_url)
 
     if getattr(feed, "status", None) and feed.status != 200:
-        raise RuntimeError(f"YouTube feed returned status {feed.status}: {feed_url}")
+        raise RuntimeError(
+            f"{target_name}: YouTube feed returned status {feed.status}: {feed_url}"
+        )
 
     if getattr(feed, "bozo", False):
-        print(f"Feed parse warning: {getattr(feed, 'bozo_exception', 'unknown')}")
+        print(
+            f"{target_name}: feed parse warning: "
+            f"{getattr(feed, 'bozo_exception', 'unknown')}"
+        )
 
     if not feed.entries:
-        raise RuntimeError(f"No YouTube videos found in feed: {feed_url}")
+        raise RuntimeError(f"{target_name}: no YouTube videos found in feed: {feed_url}")
 
     latest = feed.entries[0]
     title = latest.get("title", "YouTube")
@@ -88,15 +108,20 @@ def get_latest_youtube_video() -> tuple[str, str]:
     video_id = latest.get("yt_videoid")
     if not video_id:
         link = latest.get("link", "")
-        match = re.search(r"v=([^&]+)", link)
+        match = re.search(r"(?:v=|/shorts/)([^?&/]+)", link)
         if not match:
-            raise RuntimeError(f"Could not find video id from link: {link}")
+            raise RuntimeError(f"{target_name}: could not find video id from link: {link}")
         video_id = match.group(1)
 
     return title, video_id
 
 
 def make_video_url(video_id: str) -> str:
+    # 统一转成普通 YouTube watch 链接。
+    # Shorts 原链接如：
+    # https://youtube.com/shorts/64mxEOPAHLc?si=...
+    # 会被写成：
+    # https://www.youtube.com/watch?v=64mxEOPAHLc
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
@@ -126,16 +151,23 @@ def make_youtube_embed_block(video_url: str) -> str:
 <!-- /wp:embed -->'''
 
 
-def main() -> None:
-    title, video_id = get_latest_youtube_video()
+def publish_latest_for_target(target: dict, category_cache: dict[str, int]) -> None:
+    target_name = target["name"]
+    category_slug = target["category_slug"]
+    channel_id = get_channel_id(target)
+
+    title, video_id = get_latest_youtube_video(channel_id, target_name)
     video_url = make_video_url(video_id)
     slug = make_post_slug(video_id)
 
     if post_already_exists(slug):
-        print(f"Skip existing YouTube post: {title} ({video_url})")
+        print(f"Skip existing YouTube post [{target_name}]: {title} ({video_url})")
         return
 
-    category_id = get_category_id_by_slug(CATEGORY_SLUG)
+    if category_slug not in category_cache:
+        category_cache[category_slug] = get_category_id_by_slug(category_slug)
+
+    category_id = category_cache[category_slug]
     content = make_youtube_embed_block(video_url)
 
     payload = {
@@ -148,7 +180,18 @@ def main() -> None:
     }
 
     post = wp_post("posts", payload)
-    print(f"Published YouTube post: {title} -> {post.get('link')}")
+    print(
+        f"Published YouTube post [{target_name}]: "
+        f"{title} -> {post.get('link')} "
+        f"category={category_slug}"
+    )
+
+
+def main() -> None:
+    category_cache: dict[str, int] = {}
+
+    for target in TARGETS:
+        publish_latest_for_target(target, category_cache)
 
 
 if __name__ == "__main__":
