@@ -18,15 +18,6 @@ TARGETS = [
         "name": "fivsevn",
         "channel_id_env": "YOUTUBE_FIVSEVN_CHANNEL_ID",
         "category_slug": "motion",
-
-        # 只对 @fivsevn 生效：
-        # YouTube 标题里的 # 后面内容，不进入 WordPress 标题，
-        # 而是转成 WordPress tag。
-        #
-        # 例：
-        # "Silence Turns Red. #可灵AI"
-        # WordPress title => "Silence Turns Red."
-        # WordPress tag   => "可灵AI"
         "extract_title_tags": True,
     },
 ]
@@ -88,76 +79,35 @@ def get_category_id_by_slug(slug: str) -> int:
 
 
 def split_youtube_title_and_tags(raw_title: str) -> tuple[str, list[str]]:
-    """
-    把 YouTube 标题拆成 WordPress 标题和 WordPress tags。
-
-    规则：
-    - 第一个 # 前面的内容，作为 WordPress 标题。
-    - 每个 # 后面的内容，作为 tag。
-    - tag 去掉首尾空格。
-    - tag 去重，但保留原顺序。
-
-    例：
-    "Glass Eats Color. #Firefly"
-    => title: "Glass Eats Color."
-    => tags: ["Firefly"]
-
-    "Something. #Runway #可灵AI"
-    => title: "Something."
-    => tags: ["Runway", "可灵AI"]
-    """
     parts = raw_title.split("#")
 
-    clean_title = parts[0].strip()
-    if not clean_title:
-        clean_title = raw_title.strip() or "YouTube"
+    title = parts[0].strip()
+    if not title:
+        title = raw_title.strip() or "YouTube"
 
-    tag_names: list[str] = []
-    seen: set[str] = set()
+    tags: list[str] = []
 
     for part in parts[1:]:
-        tag_name = part.strip()
-        if not tag_name:
-            continue
+        tag = part.strip()
+        if tag:
+            tags.append(tag)
 
-        # 用小写去重，避免 Runway / runway 重复。
-        dedupe_key = tag_name.lower()
-        if dedupe_key in seen:
-            continue
-
-        seen.add(dedupe_key)
-        tag_names.append(tag_name)
-
-    return clean_title, tag_names
+    return title, tags
 
 
 def get_or_create_tag_id(name: str) -> int:
-    """
-    WordPress 创建文章时，tags 字段要传 tag ID，不是 tag 名称。
-    所以这里先按名称搜索，找不到就创建。
-    """
-    clean_name = name.strip()
-    if not clean_name:
-        raise RuntimeError("Tag name cannot be empty")
-
-    items = wp_get("tags", {"search": clean_name, "per_page": 100})
+    items = wp_get("tags", {"search": name, "per_page": 100})
 
     for item in items:
-        existing_name = str(item.get("name", "")).strip()
-        if existing_name.lower() == clean_name.lower():
+        if item.get("name", "").strip().lower() == name.strip().lower():
             return int(item["id"])
 
-    created = wp_post("tags", {"name": clean_name})
+    created = wp_post("tags", {"name": name})
     return int(created["id"])
 
 
 def get_tag_ids(names: list[str]) -> list[int]:
-    tag_ids: list[int] = []
-
-    for name in names:
-        tag_ids.append(get_or_create_tag_id(name))
-
-    return tag_ids
+    return [get_or_create_tag_id(name) for name in names]
 
 
 def get_latest_youtube_video(channel_id: str, target_name: str) -> tuple[str, str]:
@@ -280,8 +230,7 @@ def publish_latest_for_target(target: dict, category_cache: dict[str, int]) -> N
     print(
         f"Published YouTube post [{target_name}]: "
         f"{title} -> {post.get('link')} "
-        f"category={category_slug} "
-        f"tags={tag_names}"
+        f"category={category_slug}"
     )
 
 
