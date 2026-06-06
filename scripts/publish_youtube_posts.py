@@ -8,7 +8,6 @@ import requests
 
 
 # 固定发布到 WordPress 分类 slug：57storecctv
-# 对应 WordPress 后台 Posts → Categories 里面的 slug。
 CATEGORY_SLUG = "57storecctv"
 
 
@@ -72,21 +71,16 @@ def get_latest_youtube_video() -> tuple[str, str]:
         f"?channel_id={YOUTUBE_CHANNEL_ID}"
     )
 
-    print(f"YOUTUBE_CHANNEL_ID starts with: {YOUTUBE_CHANNEL_ID[:12]}...")
-    print(f"Feed URL: {feed_url}")
-
     feed = feedparser.parse(feed_url)
 
-    print(f"Feed status: {getattr(feed, 'status', 'unknown')}")
-    print(f"Feed bozo: {getattr(feed, 'bozo', 'unknown')}")
-    print(f"Feed href: {getattr(feed, 'href', 'unknown')}")
-    print(f"Feed entries count: {len(feed.entries)}")
+    if getattr(feed, "status", None) and feed.status != 200:
+        raise RuntimeError(f"YouTube feed returned status {feed.status}: {feed_url}")
 
     if getattr(feed, "bozo", False):
-        print(f"Feed bozo exception: {getattr(feed, 'bozo_exception', 'unknown')}")
+        print(f"Feed parse warning: {getattr(feed, 'bozo_exception', 'unknown')}")
 
     if not feed.entries:
-        raise RuntimeError("No YouTube videos found in feed.")
+        raise RuntimeError(f"No YouTube videos found in feed: {feed_url}")
 
     latest = feed.entries[0]
     title = latest.get("title", "YouTube")
@@ -98,9 +92,6 @@ def get_latest_youtube_video() -> tuple[str, str]:
         if not match:
             raise RuntimeError(f"Could not find video id from link: {link}")
         video_id = match.group(1)
-
-    print(f"Latest video title: {title}")
-    print(f"Latest video id: {video_id}")
 
     return title, video_id
 
@@ -139,9 +130,6 @@ def main() -> None:
     title, video_id = get_latest_youtube_video()
     video_url = make_video_url(video_id)
     slug = make_post_slug(video_id)
-
-    print(f"Post slug: {slug}")
-    print(f"Video URL: {video_url}")
 
     if post_already_exists(slug):
         print(f"Skip existing YouTube post: {title} ({video_url})")
