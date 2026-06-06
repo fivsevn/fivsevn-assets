@@ -24,10 +24,11 @@ jobs:
       - name: Install dependencies
         run: pip install requests feedparser
 
-      - name: Publish YouTube post
+      - name: Publish YouTube posts
         env:
           WP_BASE_URL: ${{ secrets.WP_BASE_URL }}
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
-          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          YOUTUBE_57STORE_CHANNEL_ID: ${{ secrets.YOUTUBE_57STORE_CHANNEL_ID }}
+          YOUTUBE_FIVSEVN_CHANNEL_ID: ${{ secrets.YOUTUBE_FIVSEVN_CHANNEL_ID }}
         run: python scripts/publish_youtube_posts.py
