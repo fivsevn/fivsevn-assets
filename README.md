@@ -255,7 +255,7 @@ youtube-VIDEO_ID
 * `fivsevn` videos are published to the `motion` category.
 
 ---
-## block editor note
+## editing note
 
 - ⚠️ 自动化发布到 WordPress 时，脚本不是直接塞普通 HTML，而是生成 WordPress / Gutenberg 识别的 block markup，比如 image block 和 YouTube embed block；这样图片尺寸更好控制，视频嵌入效果也比手写 HTML 更稳定，后续最好继续用 WordPress 区块编辑器修改。
 
