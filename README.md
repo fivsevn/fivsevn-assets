@@ -6,6 +6,9 @@
 ## update log
 
 - 2026.06.07 新增 GitHub Actions 自动发图和视频同步。
+  - 自动发图 [image post automation](#image-post-automation)
+  - 视频同步 [YouTube post automation](#youtube-post-automation)
+  - 备忘 [editing note](#editing-note)
 - 2026.05.23 新增 `stills/`，整理一下库库。
 - 2025.11.01 重构一下库库。
 - 2025.03.29 我崭新的库库。
