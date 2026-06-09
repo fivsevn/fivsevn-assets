@@ -7,7 +7,6 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 # 不同目录对应不同 WordPress 分类、tags、图片 class。
@@ -39,13 +38,20 @@ TARGETS = {
         "tags": [],
         "image_class": "",
     },
+    "stills/bygone": {
+        "category_slug": "bygone",
+        "tags": [],
+        "image_class": "",
+    },
 }
 
 
 def env(name: str) -> str:
     value = os.environ.get(name, "").strip()
+
     if not value:
         raise RuntimeError(f"Missing environment variable: {name}")
+
     return value.rstrip("/") if name.endswith("URL") else value
 
 
@@ -66,6 +72,7 @@ def run_git(args: list[str]) -> str:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+
     return result.stdout.strip()
 
 
@@ -84,31 +91,36 @@ def is_target_image(path: str) -> bool:
 def get_changed_images() -> list[str]:
     before = os.environ.get("GITHUB_BEFORE", "").strip()
     after = os.environ.get("GITHUB_SHA", "HEAD").strip()
-
     target_dirs = list(TARGETS.keys())
 
     if not before or before == "0000000000000000000000000000000000000000":
         candidates = []
+
         for target_dir in target_dirs:
             output = run_git(["ls-files", target_dir])
             candidates.extend(output.splitlines())
     else:
-        output = run_git([
-            "diff",
-            "--name-status",
-            before,
-            after,
-            "--",
-            *target_dirs,
-        ])
+        output = run_git(
+            [
+                "diff",
+                "--name-status",
+                before,
+                after,
+                "--",
+                *target_dirs,
+            ]
+        )
 
         candidates = []
+
         for line in output.splitlines():
             parts = line.split("\t")
+
             if not parts:
                 continue
 
             status = parts[0]
+
             if status.startswith("D"):
                 continue
 
@@ -116,6 +128,7 @@ def get_changed_images() -> list[str]:
             candidates.append(path)
 
     images = [path for path in candidates if is_target_image(path)]
+
     return sorted(set(images))
 
 
@@ -129,12 +142,14 @@ def get_target_dir_for_path(path: str) -> str:
 
 def get_config_for_path(path: str) -> dict:
     target_dir = get_target_dir_for_path(path)
+
     return TARGETS[target_dir]
 
 
 def get_file_commit_time(path: str) -> datetime:
     iso_time = run_git(["log", "-1", "--format=%cI", "--", path])
     dt = datetime.fromisoformat(iso_time)
+
     return dt.astimezone(ZoneInfo(TITLE_TIMEZONE))
 
 
@@ -151,6 +166,7 @@ def wp_get(endpoint: str, params: dict | None = None):
         timeout=30,
     )
     response.raise_for_status()
+
     return response.json()
 
 
@@ -162,11 +178,13 @@ def wp_post(endpoint: str, payload: dict):
         timeout=30,
     )
     response.raise_for_status()
+
     return response.json()
 
 
 def get_category_id_by_slug(slug: str) -> int:
     items = wp_get("categories", {"slug": slug, "per_page": 100})
+
     if items:
         return int(items[0]["id"])
 
@@ -198,6 +216,7 @@ def get_or_create_tag_id(name: str) -> int:
             return int(item["id"])
 
     created = wp_post("tags", {"name": name})
+
     return int(created["id"])
 
 
@@ -208,6 +227,7 @@ def make_post_slug(path: str) -> str:
         .replace("_", "-")
         .replace(".", "-")
     )
+
     return f"asset-{safe}"
 
 
@@ -220,6 +240,7 @@ def post_already_exists(slug: str) -> bool:
             "per_page": 10,
         },
     )
+
     return bool(items)
 
 
@@ -235,13 +256,13 @@ def make_image_block(image_url: str, title: str, image_class: str) -> str:
     if image_class:
         return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none","className":"{escaped_class}"}} -->
 <figure class="wp-block-image {escaped_class}">
-  <img src="{escaped_url}" alt="{escaped_title}" />
+    <img src="{escaped_url}" alt="{escaped_title}" />
 </figure>
 <!-- /wp:image -->'''
 
     return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none"}} -->
 <figure class="wp-block-image">
-  <img src="{escaped_url}" alt="{escaped_title}" />
+    <img src="{escaped_url}" alt="{escaped_title}" />
 </figure>
 <!-- /wp:image -->'''
 
@@ -272,9 +293,11 @@ def publish_image(
     category_id = category_cache[category_slug]
 
     tag_ids = []
+
     for tag_name in tag_names:
         if tag_name not in tag_cache:
             tag_cache[tag_name] = get_or_create_tag_id(tag_name)
+
         tag_ids.append(tag_cache[tag_name])
 
     content = make_image_block(image_url, title, image_class)
