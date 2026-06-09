@@ -42,6 +42,7 @@ TARGETS = {
         "category_slug": "bygone",
         "tags": [],
         "image_class": "",
+        "title_from_filename": True,
     },
 }
 
@@ -156,6 +157,12 @@ def get_file_commit_time(path: str) -> datetime:
 def format_title(dt: datetime) -> str:
     # 例：06 Jun, 2026 05:51
     return dt.strftime("%d %b, %Y %H:%M")
+
+
+def format_title_from_filename(path: str) -> str:
+    stem = Path(path).stem
+
+    return stem.replace("_", " ").replace("-", " ").strip()
 
 
 def wp_get(endpoint: str, params: dict | None = None):
@@ -279,7 +286,12 @@ def publish_image(
     image_class = config["image_class"]
 
     dt = get_file_commit_time(path)
-    title = format_title(dt)
+
+    if config.get("title_from_filename"):
+        title = format_title_from_filename(path)
+    else:
+        title = format_title(dt)
+
     image_url = make_image_url(path)
     slug = make_post_slug(path)
 
