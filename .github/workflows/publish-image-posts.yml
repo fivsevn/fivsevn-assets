@@ -10,6 +10,7 @@ on:
       - "foodie/nothomecooked/**"
       - "natsci/fieldlog/**"
       - "post/stream/**"
+      - "stills/bygone/**"
 
 permissions:
   contents: read
