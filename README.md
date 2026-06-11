@@ -79,6 +79,8 @@ fivsevn-assets/
 │           └── 20250331corpus.jpeg
 ├── stills/
 │   ├── ...
+│   ├── bygone/
+│   │   └── ...
 │   └── 20190406originalfivsevn/
 │       └── ...
 ├── scripts/
@@ -115,6 +117,7 @@ fivsevn-assets/
 | `foodie/nothomecooked/` | `foodie` | `daily` | one image block |
 | `natsci/fieldlog/` | `fieldlog` | none | one image block |
 | `post/stream/` | `posts` | none | one image block |
+| `stills/bygone/` | `posts` | none | one image block |
 
 ### how it works
 
@@ -132,7 +135,8 @@ foodie/eastwindx1/**
 foodie/byme/**  
 foodie/nothomecooked/**  
 natsci/fieldlog/**  
-post/stream/**  
+post/stream/**
+stills/bygone/**  
 ```
 
 - The workflow checks out the repository with full Git history, sets up Python 3.11, installs requests, and then runs:
