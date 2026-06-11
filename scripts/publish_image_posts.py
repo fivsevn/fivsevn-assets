@@ -37,6 +37,7 @@ TARGETS = {
         "category_slug": "posts",
         "tags": [],
         "image_class": "",
+        "content_from_commit_body": True,
     },
     "stills/bygone": {
         "category_slug": "bygone",
@@ -274,6 +275,34 @@ def make_image_block(image_url: str, title: str, image_class: str) -> str:
 <!-- /wp:image -->'''
 
 
+def get_commit_body(path: str) -> str:
+    message = run_git(["log", "-1", "--format=%B", "--", path]).strip()
+    lines = message.splitlines()
+
+    if len(lines) <= 1:
+        return ""
+
+    body_lines = lines[1:]
+
+    while body_lines and not body_lines[0].strip():
+        body_lines.pop(0)
+
+    return "\n".join(body_lines).strip()
+
+
+def make_paragraph_blocks(text: str) -> str:
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    blocks = []
+
+    for paragraph in paragraphs:
+        escaped = html.escape(paragraph, quote=True).replace("\n", "<br>")
+        blocks.append(f'''<!-- wp:paragraph -->
+<p>{escaped}</p>
+<!-- /wp:paragraph -->''')
+
+    return "\n\n".join(blocks)
+
+
 def publish_image(
     path: str,
     category_cache: dict[str, int],
@@ -312,7 +341,16 @@ def publish_image(
 
         tag_ids.append(tag_cache[tag_name])
 
-    content = make_image_block(image_url, title, image_class)
+    image_block = make_image_block(image_url, title, image_class)
+
+    commit_body = ""
+    if config.get("content_from_commit_body"):
+        commit_body = get_commit_body(path)
+
+    if commit_body:
+        content = f"{image_block}\n\n{make_paragraph_blocks(commit_body)}"
+    else:
+        content = image_block
 
     payload = {
         "status": "publish",
