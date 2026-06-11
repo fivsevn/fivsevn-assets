@@ -117,7 +117,7 @@ fivsevn-assets/
 | `foodie/nothomecooked/` | `foodie` | `daily` | one image block |
 | `natsci/fieldlog/` | `fieldlog` | none | one image block |
 | `post/stream/` | `posts` | none | one image block |
-| `stills/bygone/` | `posts` | none | one image block |
+| `stills/bygone/` | `bygone` | none | one image block |
 
 ### how it works
 
