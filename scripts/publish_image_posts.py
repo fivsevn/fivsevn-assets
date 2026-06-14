@@ -32,6 +32,7 @@ TARGETS = {
         "category_slug": "fieldlog",
         "tags": [],
         "image_class": "",
+        "content_from_commit_body": True,
     },
     "post/stream": {
         "category_slug": "posts",
