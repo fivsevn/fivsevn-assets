@@ -7,13 +7,9 @@ import feedparser
 import requests
 
 
-# 两个 YouTube 频道分别发布到不同 WordPress 分类。
+# 旧 assets 仓库只负责 fivsevn 频道。
+# 57store.fivsevn 已迁移到 fivsevn/fivsevn-57store 仓库。
 TARGETS = [
-    {
-        "name": "57store.fivsevn",
-        "channel_id_env": "YOUTUBE_57STORE_CHANNEL_ID",
-        "category_slug": "57storecctv",
-    },
     {
         "name": "fivsevn",
         "channel_id_env": "YOUTUBE_FIVSEVN_CHANNEL_ID",
@@ -27,6 +23,7 @@ def env(name: str) -> str:
     value = os.environ.get(name, "").strip()
     if not value:
         raise RuntimeError(f"Missing environment variable: {name}")
+
     return value.rstrip("/") if name.endswith("URL") else value
 
 
@@ -55,33 +52,39 @@ def wp_post(endpoint: str, payload: dict):
         auth=AUTH,
         timeout=30,
     )
+
     if not response.ok:
         print(response.status_code, response.text, file=sys.stderr)
+
     response.raise_for_status()
     return response.json()
 
 
 def get_channel_id(target: dict) -> str:
     channel_id = env(target["channel_id_env"])
+
     if not channel_id.startswith("UC"):
         raise RuntimeError(
             f"{target['name']}: channel id must be the UC... id only, "
             f"not a handle or URL. Current value starts with: {channel_id[:30]}"
         )
+
     return channel_id
 
 
 def get_category_id_by_slug(slug: str) -> int:
     items = wp_get("categories", {"slug": slug, "per_page": 100})
+
     if items:
         return int(items[0]["id"])
+
     raise RuntimeError(f"Category not found by slug: {slug}")
 
 
 def split_youtube_title_and_tags(raw_title: str) -> tuple[str, list[str]]:
     parts = raw_title.split("#")
-
     title = parts[0].strip()
+
     if not title:
         title = raw_title.strip() or "YouTube"
 
@@ -133,15 +136,16 @@ def get_latest_youtube_video(channel_id: str, target_name: str) -> tuple[str, st
         raise RuntimeError(f"{target_name}: no YouTube videos found in feed: {feed_url}")
 
     latest = feed.entries[0]
-
     title = latest.get("title", "YouTube")
     video_id = latest.get("yt_videoid")
 
     if not video_id:
         link = latest.get("link", "")
         match = re.search(r"(?:v=|/shorts/)([^?&/]+)", link)
+
         if not match:
             raise RuntimeError(f"{target_name}: could not find video id from link: {link}")
+
         video_id = match.group(1)
 
     return title, video_id
@@ -169,6 +173,7 @@ def post_already_exists(slug: str) -> bool:
             "per_page": 10,
         },
     )
+
     return bool(items)
 
 
@@ -176,11 +181,11 @@ def make_youtube_embed_block(video_url: str) -> str:
     escaped_url = html.escape(video_url, quote=True)
 
     return f"""
-<!-- wp:embed {{"url":"{escaped_url}","type":"video","providerNameSlug":"youtube","responsive":false}} -->
-<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube">
-<div class="wp-block-embed__wrapper">
-{escaped_url}
-</div>
+<!-- wp:embed {{"url":"{escaped_url}","type":"video","providerNameSlug":"youtube","responsive":true,"className":"wp-embed-aspect-16-9 wp-has-aspect-ratio"}} -->
+<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube wp-embed-aspect-16-9 wp-has-aspect-ratio">
+  <div class="wp-block-embed__wrapper">
+    {escaped_url}
+  </div>
 </figure>
 <!-- /wp:embed -->
 """.strip()
@@ -191,7 +196,6 @@ def publish_latest_for_target(target: dict, category_cache: dict[str, int]) -> N
     category_slug = target["category_slug"]
 
     channel_id = get_channel_id(target)
-
     raw_title, video_id = get_latest_youtube_video(channel_id, target_name)
 
     if target.get("extract_title_tags"):
