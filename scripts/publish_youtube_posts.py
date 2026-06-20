@@ -7,8 +7,6 @@ import feedparser
 import requests
 
 
-# 旧 assets 仓库只负责 fivsevn 频道。
-# 57store.fivsevn 已迁移到 fivsevn/fivsevn-57store 仓库。
 TARGETS = [
     {
         "name": "fivsevn",
