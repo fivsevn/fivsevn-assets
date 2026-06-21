@@ -195,7 +195,7 @@ GITHUB_SHA
 ---
 ## YouTube post automation
 
-- This repository also includes a scheduled YouTube-to-WordPress automation.
+- This repository includes a scheduled YouTube-to-WordPress automation for the `fivsevn` channel.
 
 - The automation is split into two files:
 
@@ -222,7 +222,6 @@ python scripts/publish_youtube_posts.py
 WP_BASE_URL  
 WP_USERNAME  
 WP_APP_PASSWORD  
-YOUTUBE_57STORE_CHANNEL_ID  
 YOUTUBE_FIVSEVN_CHANNEL_ID  
 ```
 
@@ -230,7 +229,6 @@ YOUTUBE_FIVSEVN_CHANNEL_ID
 
 | YouTube channel | WordPress category | Post format | Post content |
 |---|---|---|---|
-| `57store.fivsevn` | `57storecctv` | `video` | one YouTube embed block |
 | `fivsevn` | `motion` | `video` | one YouTube embed block |
 
 ### how it works
@@ -259,11 +257,10 @@ youtube-VIDEO_ID
 
 ### notes
 
-* The automation only publishes the latest video from each configured YouTube channel.
+* The automation only publishes the latest video from the configured YouTube channel.
 * Duplicate publishing is prevented by checking whether a WordPress post with the generated YouTube slug already exists.
 * YouTube Shorts URLs are normalized into regular `watch?v=` URLs before being inserted into WordPress.
 * The video itself stays on YouTube; WordPress only stores the embed block.
-* `57store.fivsevn` videos are published to the `57storecctv` category.
 * `fivsevn` videos are published to the `motion` category.
 
 ---
