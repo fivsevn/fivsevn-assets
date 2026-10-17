@@ -5,8 +5,8 @@
 ---
 ## update log
 
-- 2026.10.18 `post/stream/` 改为发布到 [flux](https://flux.fivsevn.com/)，快捷指令不变；原图保留在本仓库，flux 自动复制存档。[操作说明](https://github.com/fivsevn-agy/fivsevn-devlog/blob/main/posts/README.md#1-短内容flux)。
-- 2026.06.11 `post/stream/` 和 `natsci/fieldlog/` 支持从 commit extended description 生成图片下方正文。
+- 2026.10.18 `post/flux/` 改为发布到 [flux](https://flux.fivsevn.com/)，图片目录统一为 `post/flux/`，快捷指令需重新选择保存目录；原图保留在本仓库，flux 自动复制存档。[操作说明](https://github.com/fivsevn-agy/fivsevn-devlog/blob/main/posts/README.md#1-短内容flux)。
+- 2026.06.11 `post/flux/`（原 `post/stream/`） 和 `natsci/fieldlog/` 支持从 commit extended description 生成图片下方正文。
 - 2026.06.07 新增 GitHub Actions 自动发图和视频同步。
   - 自动发图 [image post automation](#image-post-automation)
   - 视频同步 [YouTube post automation](#youtube-post-automation)
@@ -61,7 +61,7 @@ fivsevn-assets/
 │       ├── IMG_6852.JPG
 │       └── IMG_6856.JPG
 ├── post/
-│   ├── stream/
+│   ├── flux/
 │   │   ├── ...
 │   │   ├── IMG_6858.GIF
 │   │   └── IMG_6891.PNG
