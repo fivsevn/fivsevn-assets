@@ -12,6 +12,7 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 # 不同目录对应不同 WordPress 分类、tags、图片 class。
 # category_slug 对应 WordPress 后台里的 slug。
 # image_class 为空时，不额外加 class，走 WordPress 默认 image block 样式。
+# post/stream is now consumed directly by fivsevn-flux; never send it to WordPress.
 TARGETS = {
     "foodie/eastwindx1": {
         "category_slug": "foodie",
@@ -30,12 +31,6 @@ TARGETS = {
     },
     "natsci/fieldlog": {
         "category_slug": "fieldlog",
-        "tags": [],
-        "image_class": "",
-        "content_from_commit_body": True,
-    },
-    "post/stream": {
-        "category_slug": "posts",
         "tags": [],
         "image_class": "",
         "content_from_commit_body": True,
