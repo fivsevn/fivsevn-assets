@@ -1,0 +1,29 @@
+name: Migrate flux image folder
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/migrate-flux-folder.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: flux-folder-migration
+  queue: max
+  cancel-in-progress: false
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply reviewed folder migration
+        run: |
+          python -c "import zipfile; exec(compile(zipfile.ZipFile('flux-folder-update.zip').read('apply.py'), 'apply.py', 'exec'))"
+      - name: Commit migration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'migrate image publishing paths to flux'
+          git push origin HEAD:main
