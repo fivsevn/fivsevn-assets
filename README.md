@@ -1,5 +1,13 @@
 # fivsevn-assets
 
+## post/stream → flux（2026-10-18 起）
+
+图片快捷指令和 Working Copy 提交流程保持不变。`post/stream/` 已退出 WordPress 发布脚本，由 [flux](https://flux.fivsevn.com/) 直接从 GitHub 接收；每张新图生成一条记录，extended description 是支持 Markdown 的配文。flux 约每 5 分钟检查一次，GitHub 调度可能延后，并将图片复制到自己的文章包。相同路径不会重复发文，修改旧帖应编辑 flux 文章包。
+
+查看 [Publish flux](https://github.com/fivsevn/fivsevn-flux/actions/workflows/build.yml) 确认上线。下面的 WordPress 自动化说明继续适用于 foodie、fieldlog、bygone 和 YouTube，均保持原流程。
+
+
+
 - A repository for storing images and assets used in my blog: fivsevn.com
 
 ---
@@ -117,7 +125,7 @@ fivsevn-assets/
 | `foodie/byme/` | `foodie` | `daily`, `史诗级大厨` | one image block |
 | `foodie/nothomecooked/` | `foodie` | `daily` | one image block |
 | `natsci/fieldlog/` | `fieldlog` | none | one image block + optional paragraph blocks from commit extended description |
-| `post/stream/` | `posts` | none | one image block + optional paragraph blocks from commit extended description |
+
 | `stills/bygone/` | `bygone` | none | one image block |
 
 ### how it works
@@ -136,7 +144,6 @@ foodie/eastwindx1/**
 foodie/byme/**  
 foodie/nothomecooked/**  
 natsci/fieldlog/**  
-post/stream/**
 stills/bygone/**  
 ```
 
@@ -172,7 +179,7 @@ GITHUB_SHA
 
 6. Build the image URL from CDN_BASE_URL plus the repository path.
 7. Generate a stable WordPress slug from the image path.
-8. For `post/stream/` and `natsci/fieldlog/`, read the commit extended description and append it below the image as native WordPress paragraph blocks.
+8. For `natsci/fieldlog/`, read the commit extended description and append it below the image as native WordPress paragraph blocks.
 9. Skip publishing if a post with the same slug already exists.
 10. Resolve the WordPress category by slug.
 11. Find or create required WordPress tags.
@@ -185,10 +192,10 @@ GITHUB_SHA
 * The image itself stays in this GitHub repository and is inserted into WordPress through the CDN URL.
 * WordPress does not upload the image into the Media Library.
 * The generated content is a native WordPress image block.
-* `post/stream/` and `natsci/fieldlog/` can append text below the image from the commit extended description.
-* `post/stream/` and `natsci/fieldlog/` text is generated as native WordPress paragraph blocks, not plain HTML.
+* `natsci/fieldlog/` can append text below the image from the commit extended description.
+* `natsci/fieldlog/` text is generated as native WordPress paragraph blocks, not plain HTML.
 * foodie images use the foodie-photo-square class so they can be displayed as square images through WordPress Additional CSS.
-* fieldlog, stream, and bygone images use the default WordPress image block style.
+* fieldlog and bygone images use the default WordPress image block style.
 * bygone image titles are generated from filenames.
 * Duplicate publishing is prevented by checking whether a WordPress post with the generated slug already exists.
 
@@ -292,7 +299,7 @@ def make_image_block(image_url: str, title: str, image_class: str) -> str:
 <!-- /wp:image -->'''
 ```
 
-For `post/stream/` and `natsci/fieldlog/`, when the commit has an extended description, the script appends it below the image as native paragraph blocks:
+For `natsci/fieldlog/`, when the commit has an extended description, the script appends it below the image as native paragraph blocks:
 
 ```python
 def make_paragraph_blocks(text: str) -> str:
@@ -366,7 +373,7 @@ This means the automation is not simply inserting raw HTML. It is creating image
 This is important because:
 
 * Image size and layout are easier to control when the image is a WordPress image block.
-* `post/stream/` and `natsci/fieldlog/` text remains editable as native WordPress paragraph blocks.
+* `natsci/fieldlog/` text remains editable as native WordPress paragraph blocks.
 * YouTube videos render more reliably as native YouTube embed blocks than as manually written HTML embeds.
 * Later edits should be made in the WordPress block editor / Gutenberg editor, so the generated block structure is preserved.
 * Manually rewriting the generated markup as plain HTML may break the expected block structure or make later visual editing less predictable.
