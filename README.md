@@ -1,18 +1,11 @@
 # fivsevn-assets
 
-## post/stream → flux（2026-10-18 起）
-
-图片快捷指令和 Working Copy 提交流程保持不变。`post/stream/` 已退出 WordPress 发布脚本，由 [flux](https://flux.fivsevn.com/) 直接从 GitHub 接收；每张新图生成一条记录，extended description 是支持 Markdown 的配文。flux 约每 5 分钟检查一次，GitHub 调度可能延后，并将图片复制到自己的文章包。相同路径不会重复发文，修改旧帖应编辑 flux 文章包。
-
-查看 [Publish flux](https://github.com/fivsevn/fivsevn-flux/actions/workflows/build.yml) 确认上线。下面的 WordPress 自动化说明继续适用于 foodie、fieldlog、bygone 和 YouTube，均保持原流程。
-
-
-
 - A repository for storing images and assets used in my blog: fivsevn.com
 
 ---
 ## update log
 
+- 2026.10.18 `post/stream/` 改为发布到 [flux](https://flux.fivsevn.com/)，快捷指令不变；原图保留在本仓库，flux 自动复制存档。[操作说明](https://github.com/fivsevn-agy/fivsevn-devlog/blob/main/posts/README.md#1-短内容flux)。
 - 2026.06.11 `post/stream/` 和 `natsci/fieldlog/` 支持从 commit extended description 生成图片下方正文。
 - 2026.06.07 新增 GitHub Actions 自动发图和视频同步。
   - 自动发图 [image post automation](#image-post-automation)
