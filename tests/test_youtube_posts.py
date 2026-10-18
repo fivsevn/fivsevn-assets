@@ -33,6 +33,7 @@ class FeedTests(unittest.TestCase):
     def setUp(self):
         self.sleep = patch.object(publisher.time, 'sleep').start()
         self.get = patch.object(publisher.requests, 'get').start()
+        self.fallback = patch.object(publisher, 'get_latest_uploads_video', side_effect=ValueError('unavailable')).start()
         self.addCleanup(patch.stopall)
 
     def read(self):
@@ -147,6 +148,78 @@ class PublishingTests(unittest.TestCase):
             with self.assertRaises(publisher.requests.Timeout):
                 publisher.publish_latest_for_target(publisher.TARGETS[0], {})
         post.assert_called_once()
+
+
+class UploadsPageTests(unittest.TestCase):
+    def page(self, card, *, owner='UCexample', playlist='UUexample', grid=True, recommendation=None):
+        import json
+        renderer = {'richGridRenderer': {'contents': [{'richItemRenderer': {'content': card}}]}} if grid else {
+            'playlistVideoListRenderer': {'contents': [card]}}
+        data = {
+            'header': {'playlistHeaderRenderer': {'playlistId': playlist,
+                'ownerEndpoint': {'browseEndpoint': {'browseId': owner}}}},
+            'contents': {'twoColumnBrowseResultsRenderer': {'tabs': [{'tabRenderer': {'content': renderer}}]}},
+        }
+        if recommendation is not None: data['recommendations'] = recommendation
+        return '<script>var ytInitialData = ' + json.dumps(data) + ';</script>'
+
+    def short(self, title='Title #tag', video=VIDEO):
+        return {'shortsLockupViewModel': {
+            'onTap': {'innertubeCommand': {'reelWatchEndpoint': {'videoId': video}}},
+            'overlayMetadata': {'primaryText': {'content': title}}}}
+
+    def test_modern_shorts_and_regular_video_layouts_preserve_full_titles(self):
+        cards = [self.short(), {'lockupViewModel': {'contentId': VIDEO,
+            'contentType': 'LOCKUP_CONTENT_TYPE_VIDEO', 'metadata': {
+                'lockupMetadataViewModel': {'title': {'content': 'Title #tag'}}}}},
+            {'videoRenderer': {'videoId': VIDEO, 'title': {'runs': [{'text': 'Title #tag'}]}}}]
+        for card in cards:
+            with self.subTest(card=card):
+                self.assertEqual(publisher.parse_uploads_page(self.page(card), 'UCexample'), ('Title #tag', VIDEO))
+
+    def test_classic_playlist_layout(self):
+        card = {'playlistVideoRenderer': {'videoId': VIDEO, 'isPlayable': True,
+            'title': {'simpleText': 'Title #tag'}}}
+        self.assertEqual(publisher.parse_uploads_page(self.page(card, grid=False), 'UCexample'), ('Title #tag', VIDEO))
+
+    def test_recommendations_are_not_selected(self):
+        self.assertEqual(publisher.parse_uploads_page(self.page(self.short(),
+            recommendation=self.short('Wrong title', 'xxxxxxxxxxx')), 'UCexample'), ('Title #tag', VIDEO))
+
+    def test_wrong_channel_or_playlist_is_rejected(self):
+        for options in [{'owner': 'UCother'}, {'playlist': 'UUother'}]:
+            with self.subTest(options=options), self.assertRaisesRegex(RuntimeError, 'identity'):
+                publisher.parse_uploads_page(self.page(self.short(), **options), 'UCexample')
+
+    def test_unknown_or_incomplete_layout_fails_instead_of_selecting_recommendations(self):
+        for document in ['<html>Consent required</html>', '<script>var ytInitialData = {broken};</script>',
+                self.page({'unknownNewCard': {}}, recommendation=self.short()), self.page(self.short(video='invalid'))]:
+            with self.subTest(document=document), self.assertRaises(ValueError):
+                publisher.parse_uploads_page(document, 'UCexample')
+
+    def test_rss_404_uses_the_verified_uploads_page_without_waiting(self):
+        with patch.object(publisher.requests, 'get', return_value=response(404)), \
+                patch.object(publisher, 'get_latest_uploads_video', return_value=('Title #tag', VIDEO)) as fallback, \
+                patch.object(publisher.time, 'sleep') as sleep:
+            self.assertEqual(publisher.get_latest_youtube_video('UCexample', 'example'), ('Title #tag', VIDEO))
+        fallback.assert_called_once_with('UCexample')
+        sleep.assert_not_called()
+
+    def test_fallback_timeout_and_page_error_are_retried(self):
+        with patch.object(publisher.requests, 'get', side_effect=[response(404), response(404), response()]), \
+                patch.object(publisher, 'get_latest_uploads_video', side_effect=[publisher.requests.Timeout(), ValueError('bad page')]), \
+                patch.object(publisher.time, 'sleep') as sleep:
+            self.assertEqual(publisher.get_latest_youtube_video('UCexample', 'example')[1], VIDEO)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [5, 15])
+
+    def test_fallback_rejects_another_owner_without_wordpress_writes(self):
+        with patch.object(publisher.requests, 'get', return_value=response(404)), \
+                patch.object(publisher, 'get_latest_uploads_video', side_effect=RuntimeError('identity mismatch')), \
+                patch.object(publisher, 'get_channel_id', return_value='UCexample'), \
+                patch.object(publisher, 'wp_post') as post:
+            with self.assertRaisesRegex(RuntimeError, 'identity mismatch'):
+                publisher.publish_latest_for_target(publisher.TARGETS[0], {})
+        post.assert_not_called()
 
 
 if __name__ == '__main__':
