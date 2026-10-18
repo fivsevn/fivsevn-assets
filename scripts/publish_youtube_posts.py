@@ -2,6 +2,7 @@ import html
 import os
 import re
 import sys
+import time
 
 import feedparser
 import requests
@@ -15,6 +16,9 @@ TARGETS = [
         "extract_title_tags": True,
     },
 ]
+
+FEED_RETRY_DELAYS = (5, 15, 30)
+FEED_TIMEOUT = (10, 30)
 
 
 def env(name: str) -> str:
@@ -109,34 +113,55 @@ def get_latest_youtube_video(channel_id: str, target_name: str) -> tuple[str, st
         f"?channel_id={channel_id}"
     )
 
-    feed = feedparser.parse(feed_url)
+    attempts = len(FEED_RETRY_DELAYS) + 1
+    reason = "no response"
+    for attempt in range(attempts):
+        try:
+            # Download explicitly: feedparser's URL fetch has no per-request timeout.
+            # Only this read is retried; a WordPress POST must never be replayed blindly.
+            response = requests.get(
+                feed_url,
+                headers={"User-Agent": "fivsevn-youtube-sync/1.0", "Accept": "application/atom+xml"},
+                timeout=FEED_TIMEOUT,
+            )
+        except requests.RequestException as error:
+            reason = f"network error ({type(error).__name__})"
+        else:
+            if response.status_code != 200:
+                reason = f"HTTP {response.status_code}"
+                if response.status_code not in {404, 408, 429} and not 500 <= response.status_code < 600:
+                    raise RuntimeError(f"{target_name}: YouTube feed returned {reason}")
+            else:
+                feed = feedparser.parse(response.content)
+                if feed.get("bozo") or not feed.get("version"):
+                    reason = "invalid feed document"
+                elif not feed.entries:
+                    reason = "feed contains no videos"
+                else:
+                    source_channel = feed.feed.get("yt_channelid")
+                    if source_channel and source_channel != channel_id:
+                        raise RuntimeError(f"{target_name}: YouTube feed belongs to another channel")
+                    latest = feed.entries[0]
+                    title = latest.get("title", "YouTube")
+                    video_id = latest.get("yt_videoid")
+                    if not video_id:
+                        match = re.search(r"(?:v=|/shorts/)([^?&/]+)", latest.get("link", ""))
+                        video_id = match.group(1) if match else None
+                    if video_id:
+                        print(f"Read latest YouTube video [{target_name}] on attempt {attempt + 1}/{attempts}.", flush=True)
+                        return title, video_id
+                    reason = "latest feed entry has no video ID"
 
-    if getattr(feed, "status", None) and feed.status != 200:
-        raise RuntimeError(
-            f"{target_name}: YouTube feed returned status {feed.status}: {feed_url}"
-        )
+        if attempt < len(FEED_RETRY_DELAYS):
+            delay = FEED_RETRY_DELAYS[attempt]
+            print(
+                f"YouTube feed [{target_name}]: {reason}; attempt {attempt + 1}/{attempts} "
+                f"failed, retrying in {delay}s.",
+                flush=True,
+            )
+            time.sleep(delay)
 
-    if getattr(feed, "bozo", False):
-        print(
-            f"{target_name}: feed parse warning: "
-            f"{getattr(feed, 'bozo_exception', 'unknown')}"
-        )
-
-    if not feed.entries:
-        raise RuntimeError(f"{target_name}: no YouTube videos found in feed: {feed_url}")
-
-    latest = feed.entries[0]
-    title = latest.get("title", "YouTube")
-    video_id = latest.get("yt_videoid")
-
-    if not video_id:
-        link = latest.get("link", "")
-        match = re.search(r"(?:v=|/shorts/)([^?&/]+)", link)
-        if not match:
-            raise RuntimeError(f"{target_name}: could not find video id from link: {link}")
-        video_id = match.group(1)
-
-    return title, video_id
+    raise RuntimeError(f"{target_name}: could not read YouTube feed after {attempts} attempts ({reason})")
 
 
 def make_video_url(video_id: str) -> str:

@@ -258,6 +258,8 @@ youtube-VIDEO_ID
 * YouTube Shorts URLs are normalized into regular `watch?v=` URLs before being inserted into WordPress.
 * The video itself stays on YouTube; WordPress only stores the embed block.
 * `fivsevn` videos are published to the `motion` category.
+* Feed reads have a 10-second connection timeout and a 30-second read timeout. Network errors, HTTP 404/408/429/5xx, malformed feeds, and empty responses are retried up to four times, with waits of 5, 15, and 30 seconds. Exhausted retries fail the run visibly; they are not treated as successful synchronization.
+* Scheduled and manual YouTube runs are serialized to avoid concurrent duplicate posts. WordPress writes are not automatically retried. The hourly schedule, latest-video rule, category, title tags, and embed format are unchanged.
 
 ---
 ## editing note
