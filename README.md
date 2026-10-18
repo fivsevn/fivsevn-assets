@@ -5,7 +5,7 @@
 ---
 ## update log
 
-- 2026.10.18 flux 图片与文字统一迁入 [fivsevn-flux](https://github.com/fivsevn/fivsevn-flux)：图片原稿保存在 [`uploads/`](https://github.com/fivsevn/fivsevn-flux/tree/main/uploads)，提交后直接发布。本仓库的 `post/flux/` 已移除；手机快捷指令 flux 分支需改选 fivsevn-flux 仓库及 uploads/ 目录。[操作说明](https://github.com/fivsevn-agy/fivsevn-devlog/blob/main/posts/README.md#1-短内容flux)。
+- 2026.10.18 flux 图片与文字已统一迁至 [fivsevn-flux](https://github.com/fivsevn/fivsevn-flux)，后续在该仓库发布和管理。
 - 2026.06.11 `post/flux/`（原 `post/stream/`） 和 `natsci/fieldlog/` 支持从 commit extended description 生成图片下方正文。
 - 2026.06.07 新增 GitHub Actions 自动发图和视频同步。
   - 自动发图 [image post automation](#image-post-automation)
