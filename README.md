@@ -5,7 +5,7 @@
 ---
 ## update log
 
-- 2026.10.18 flux 图片与文字统一迁入 [fivsevn-flux](https://github.com/fivsevn/fivsevn-flux)：图片原稿保存在 [`uploads/`](https://github.com/fivsevn/fivsevn-flux/tree/main/uploads)，提交后直接发布。本仓库的 `post/flux/` 已移除；手机快捷指令 flux 分支需改选 fivsevn-flux 仓库及 uploads/ 目录。[操作说明](https://github.com/fivsevn-agy/fivsevn-devlog/blob/main/posts/README.md#1-短内容flux)。
+- 2026.10.18 flux 图片与文字已统一迁至 [fivsevn-flux](https://github.com/fivsevn/fivsevn-flux)，后续在该仓库发布和管理。
 - 2026.06.11 `post/flux/`（原 `post/stream/`） 和 `natsci/fieldlog/` 支持从 commit extended description 生成图片下方正文。
 - 2026.06.07 新增 GitHub Actions 自动发图和视频同步。
   - 自动发图 [image post automation](#image-post-automation)
@@ -258,6 +258,9 @@ youtube-VIDEO_ID
 * YouTube Shorts URLs are normalized into regular `watch?v=` URLs before being inserted into WordPress.
 * The video itself stays on YouTube; WordPress only stores the embed block.
 * `fivsevn` videos are published to the `motion` category.
+* Reads have a 10-second connection timeout and a 30-second read timeout. If RSS returns 404/408/429/5xx, a network error, malformed data, or no videos, the script checks the same channel's official public uploads playlist page. It verifies the playlist ID and owner before selecting the first public upload, supports Shorts and regular videos, and rejects unknown page layouts rather than choosing an older or unrelated video. No extra key or third-party mirror is used.
+* If both sources fail, reads are retried up to four rounds, with waits of 5, 15, and 30 seconds. Exhausted retries fail the run visibly; they are not treated as successful synchronization. The public-page fallback depends on YouTube's page structure; the offline tests cover the supported layouts.
+* Scheduled and manual YouTube runs are serialized to avoid concurrent duplicate posts. WordPress writes are not automatically retried. The hourly schedule, latest-video rule, category, title tags, and embed format are unchanged.
 
 ---
 ## editing note

@@ -1,7 +1,9 @@
 import html
+import json
 import os
 import re
 import sys
+import time
 
 import feedparser
 import requests
@@ -15,6 +17,9 @@ TARGETS = [
         "extract_title_tags": True,
     },
 ]
+
+FEED_RETRY_DELAYS = (5, 15, 30)
+FEED_TIMEOUT = (10, 30)
 
 
 def env(name: str) -> str:
@@ -103,40 +108,143 @@ def get_tag_ids(names: list[str]) -> list[int]:
     return [get_or_create_tag_id(name) for name in names]
 
 
+def renderers(node, name):
+    if isinstance(node, dict):
+        if name in node:
+            yield node[name]
+        for value in node.values():
+            yield from renderers(value, name)
+    elif isinstance(node, list):
+        for value in node:
+            yield from renderers(value, name)
+
+
+def youtube_text(value: dict) -> str:
+    return value.get("simpleText") or "".join(run.get("text", "") for run in value.get("runs", []))
+
+
+def parse_uploads_page(document: str, channel_id: str) -> tuple[str, str]:
+    """Read only the owner's uploads list, never recommendations elsewhere on the page."""
+    marker = re.search(r"var ytInitialData\s*=\s*", document)
+    if not marker:
+        raise ValueError("uploads page has no initial data")
+    data, _ = json.JSONDecoder().raw_decode(document[marker.end():])
+    headers = list(renderers(data.get("header", {}), "playlistHeaderRenderer"))
+    if len(headers) != 1:
+        raise ValueError("uploads page has no unique playlist header")
+    header = headers[0]
+    playlist_id = "UU" + channel_id[2:]
+    owner = header.get("ownerEndpoint", {}).get("browseEndpoint", {}).get("browseId")
+    if header.get("playlistId") != playlist_id or owner != channel_id:
+        raise RuntimeError("YouTube uploads playlist identity does not match the configured channel")
+
+    contents = data.get("contents", {})
+    lists = list(renderers(contents, "playlistVideoListRenderer")) + list(renderers(contents, "richGridRenderer"))
+    if len(lists) != 1:
+        raise ValueError("uploads page has no unique video list")
+    for item in lists[0].get("contents", []):
+        if "continuationItemRenderer" in item:
+            continue
+        card = item.get("richItemRenderer", {}).get("content", item)
+        if "playlistVideoRenderer" in card or "videoRenderer" in card:
+            video = card.get("playlistVideoRenderer", card.get("videoRenderer"))
+            if video.get("isPlayable") is False:
+                continue
+            video_id, title = video.get("videoId"), youtube_text(video.get("title", {}))
+        elif "shortsLockupViewModel" in card:
+            video = card["shortsLockupViewModel"]
+            video_id = video.get("onTap", {}).get("innertubeCommand", {}).get("reelWatchEndpoint", {}).get("videoId")
+            title = video.get("overlayMetadata", {}).get("primaryText", {}).get("content")
+        elif "lockupViewModel" in card:
+            video = card["lockupViewModel"]
+            if video.get("contentType") != "LOCKUP_CONTENT_TYPE_VIDEO":
+                raise ValueError("unexpected item in uploads list")
+            video_id = video.get("contentId")
+            title = video.get("metadata", {}).get("lockupMetadataViewModel", {}).get("title", {}).get("content")
+        else:
+            raise ValueError("unrecognized first uploads item; refusing to select an older video")
+        if not isinstance(video_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id) or not isinstance(title, str) or not title.strip():
+            raise ValueError("uploads item has no valid video ID or title")
+        return title, video_id
+    raise ValueError("uploads playlist contains no public videos")
+
+
+def get_latest_uploads_video(channel_id: str) -> tuple[str, str]:
+    response = requests.get(
+        "https://www.youtube.com/playlist?list=UU" + channel_id[2:] + "&hl=en",
+        headers={"User-Agent": "Mozilla/5.0 (compatible; fivsevn-youtube-sync/1.0)", "Accept": "text/html"},
+        timeout=FEED_TIMEOUT,
+    )
+    response.raise_for_status()
+    return parse_uploads_page(response.text, channel_id)
+
+
 def get_latest_youtube_video(channel_id: str, target_name: str) -> tuple[str, str]:
     feed_url = (
         "https://www.youtube.com/feeds/videos.xml"
         f"?channel_id={channel_id}"
     )
 
-    feed = feedparser.parse(feed_url)
+    attempts = len(FEED_RETRY_DELAYS) + 1
+    reason = "no response"
+    for attempt in range(attempts):
+        try:
+            # Download explicitly: feedparser's URL fetch has no per-request timeout.
+            # Only this read is retried; a WordPress POST must never be replayed blindly.
+            response = requests.get(
+                feed_url,
+                headers={"User-Agent": "fivsevn-youtube-sync/1.0", "Accept": "application/atom+xml"},
+                timeout=FEED_TIMEOUT,
+            )
+        except requests.RequestException as error:
+            reason = f"network error ({type(error).__name__})"
+        else:
+            if response.status_code != 200:
+                reason = f"HTTP {response.status_code}"
+                if response.status_code not in {404, 408, 429} and not 500 <= response.status_code < 600:
+                    raise RuntimeError(f"{target_name}: YouTube feed returned {reason}")
+            else:
+                feed = feedparser.parse(response.content)
+                if feed.get("bozo") or not feed.get("version"):
+                    reason = "invalid feed document"
+                elif not feed.entries:
+                    reason = "feed contains no videos"
+                else:
+                    source_channel = feed.feed.get("yt_channelid")
+                    if source_channel and source_channel != channel_id:
+                        raise RuntimeError(f"{target_name}: YouTube feed belongs to another channel")
+                    latest = feed.entries[0]
+                    title = latest.get("title", "YouTube")
+                    video_id = latest.get("yt_videoid")
+                    if not video_id:
+                        match = re.search(r"(?:v=|/shorts/)([^?&/]+)", latest.get("link", ""))
+                        video_id = match.group(1) if match else None
+                    if video_id:
+                        print(f"Read latest YouTube video [{target_name}] on attempt {attempt + 1}/{attempts}.", flush=True)
+                        return title, video_id
+                    reason = "latest feed entry has no video ID"
 
-    if getattr(feed, "status", None) and feed.status != 200:
-        raise RuntimeError(
-            f"{target_name}: YouTube feed returned status {feed.status}: {feed_url}"
-        )
+        # YouTube can keep returning 404 for both of its XML feed endpoints while
+        # the same channel's official public uploads playlist remains available.
+        print(f"YouTube feed [{target_name}]: {reason}; checking the official uploads page.", flush=True)
+        try:
+            title, video_id = get_latest_uploads_video(channel_id)
+        except (requests.RequestException, ValueError) as error:
+            reason += f"; uploads page unavailable ({type(error).__name__})"
+        else:
+            print(f"Read latest YouTube video [{target_name}] from the verified official uploads page on attempt {attempt + 1}/{attempts}.", flush=True)
+            return title, video_id
 
-    if getattr(feed, "bozo", False):
-        print(
-            f"{target_name}: feed parse warning: "
-            f"{getattr(feed, 'bozo_exception', 'unknown')}"
-        )
+        if attempt < len(FEED_RETRY_DELAYS):
+            delay = FEED_RETRY_DELAYS[attempt]
+            print(
+                f"YouTube feed [{target_name}]: {reason}; attempt {attempt + 1}/{attempts} "
+                f"failed, retrying in {delay}s.",
+                flush=True,
+            )
+            time.sleep(delay)
 
-    if not feed.entries:
-        raise RuntimeError(f"{target_name}: no YouTube videos found in feed: {feed_url}")
-
-    latest = feed.entries[0]
-    title = latest.get("title", "YouTube")
-    video_id = latest.get("yt_videoid")
-
-    if not video_id:
-        link = latest.get("link", "")
-        match = re.search(r"(?:v=|/shorts/)([^?&/]+)", link)
-        if not match:
-            raise RuntimeError(f"{target_name}: could not find video id from link: {link}")
-        video_id = match.group(1)
-
-    return title, video_id
+    raise RuntimeError(f"{target_name}: could not read YouTube feed after {attempts} attempts ({reason})")
 
 
 def make_video_url(video_id: str) -> str:
