@@ -12,7 +12,7 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 # 不同目录对应不同 WordPress 分类、tags、图片 class。
 # category_slug 对应 WordPress 后台里的 slug。
 # image_class 为空时，不额外加 class，走 WordPress 默认 image block 样式。
-# post/flux is now consumed directly by fivsevn-flux; never send it to WordPress.
+# flux uploads now live in fivsevn-flux/uploads; no flux folder is a WordPress target.
 TARGETS = {
     "foodie/eastwindx1": {
         "category_slug": "foodie",
