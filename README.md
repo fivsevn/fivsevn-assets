@@ -5,7 +5,7 @@
 ---
 ## update log
 
-- 2026.10.29 foodie 图片与发布流程已迁至 [fivsevn-savour](https://github.com/fivsevn/fivsevn-savour)，后续在该仓库上传、发布和管理；原 `foodie/` 图片已核对后移除。
+- 2026.10.29 Savour 图片与发布流程由 [fivsevn-savour](https://github.com/fivsevn/fivsevn-savour) 管理。
 - 2026.10.18 flux 图片与文字已统一迁至 [fivsevn-flux](https://github.com/fivsevn/fivsevn-flux)，后续在该仓库发布和管理。
 - 2026.06.11 `post/flux/`（原 `post/stream/`） 和 `natsci/fieldlog/` 支持从 commit extended description 生成图片下方正文。
 - 2026.06.07 新增 GitHub Actions 自动发图和视频同步。
