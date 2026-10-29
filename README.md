@@ -5,6 +5,7 @@
 ---
 ## update log
 
+- 2026.10.29 foodie 图片与发布流程已迁至 [fivsevn-savour](https://github.com/fivsevn/fivsevn-savour)，后续在该仓库上传、发布和管理；原 `foodie/` 图片已核对后移除。
 - 2026.10.18 flux 图片与文字已统一迁至 [fivsevn-flux](https://github.com/fivsevn/fivsevn-flux)，后续在该仓库发布和管理。
 - 2026.06.11 `post/flux/`（原 `post/stream/`） 和 `natsci/fieldlog/` 支持从 commit extended description 生成图片下方正文。
 - 2026.06.07 新增 GitHub Actions 自动发图和视频同步。
@@ -44,17 +45,6 @@ fivsevn-assets/
 │       ├── ...
 │       ├── 57store20260224f.webp
 │       └── 57store20260224p.webp
-├── foodie/
-│   ├── eastwindx1/
-│   │   ├── ...
-│   │   ├── IMG_6820.JPG
-│   │   └── IMG_6851.WEBP
-│   ├── byme/
-│   │   ├── ...
-│   │   └── IMG_6827.JPG
-│   └── nothomecooked/
-│       ├── ...
-│       └── IMG_6825.JPG
 ├── natsci/
 │   └── fieldlog/
 │       ├── ...
@@ -110,9 +100,6 @@ fivsevn-assets/
 
 | GitHub folder | WordPress category | WordPress tags | Post content |
 |---|---|---|---|
-| `foodie/eastwindx1/` | `foodie` | `daily`, `东风一只bowl` | one image block |
-| `foodie/byme/` | `foodie` | `daily`, `史诗级大厨` | one image block |
-| `foodie/nothomecooked/` | `foodie` | `daily` | one image block |
 | `natsci/fieldlog/` | `fieldlog` | none | one image block + optional paragraph blocks from commit extended description |
 
 | `stills/bygone/` | `bygone` | none | one image block |
@@ -129,9 +116,6 @@ scripts/publish_image_posts.py
 - The workflow runs on pushes to main, but only when files under these paths change:
 
 ```text
-foodie/eastwindx1/**  
-foodie/byme/**  
-foodie/nothomecooked/**  
 natsci/fieldlog/**  
 stills/bygone/**  
 ```
@@ -183,7 +167,6 @@ GITHUB_SHA
 * The generated content is a native WordPress image block.
 * `natsci/fieldlog/` can append text below the image from the commit extended description.
 * `natsci/fieldlog/` text is generated as native WordPress paragraph blocks, not plain HTML.
-* foodie images use the foodie-photo-square class so they can be displayed as square images through WordPress Additional CSS.
 * fieldlog and bygone images use the default WordPress image block style.
 * bygone image titles are generated from filenames.
 * Duplicate publishing is prevented by checking whether a WordPress post with the generated slug already exists.
