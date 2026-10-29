@@ -14,21 +14,6 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 # image_class 为空时，不额外加 class，走 WordPress 默认 image block 样式。
 # Flux publishing is handled by fivsevn-flux; no flux folder is a WordPress target.
 TARGETS = {
-    "foodie/eastwindx1": {
-        "category_slug": "foodie",
-        "tags": ["daily", "东风一只bowl"],
-        "image_class": "foodie-photo-square",
-    },
-    "foodie/byme": {
-        "category_slug": "foodie",
-        "tags": ["daily", "史诗级大厨"],
-        "image_class": "foodie-photo-square",
-    },
-    "foodie/nothomecooked": {
-        "category_slug": "foodie",
-        "tags": ["daily"],
-        "image_class": "foodie-photo-square",
-    },
     "natsci/fieldlog": {
         "category_slug": "fieldlog",
         "tags": [],
