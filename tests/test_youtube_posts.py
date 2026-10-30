@@ -148,5 +148,77 @@ class PublishingTests(unittest.TestCase):
                 self.post.assert_not_called()
 
 
+class WordPressTransportTests(unittest.TestCase):
+    def setUp(self):
+        patch.dict(os.environ, {
+            'WP_BASE_URL': 'https://example.test',
+            'WP_USERNAME': 'test', 'WP_APP_PASSWORD': 'test',
+        }).start()
+        self.pace = patch.object(publisher, 'pace_wordpress').start()
+        self.sleep = patch.object(publisher.time, 'sleep').start()
+        self.addCleanup(patch.stopall)
+
+    def response(self, status=200, retry_after=None):
+        response = publisher.requests.Response()
+        response.status_code = status
+        response.url = 'https://example.test/wp-json/wp/v2/posts'
+        response._content = b'[]'
+        if retry_after is not None:
+            response.headers['Retry-After'] = retry_after
+        return response
+
+    def test_rate_limited_read_respects_retry_after_and_recovers(self):
+        with patch.object(publisher.requests, 'get', side_effect=[self.response(429, '12'), self.response(503), self.response()]) as get:
+            self.assertEqual(publisher.wp_get('posts'), [])
+        self.assertEqual([c.args[0] for c in self.sleep.call_args_list], [12, 15])
+        self.assertEqual(self.pace.call_count, 3)
+        self.assertEqual(get.call_args.kwargs['timeout'], (10, 30))
+
+    def test_retry_after_http_date_is_respected(self):
+        from datetime import datetime, timedelta, timezone
+        from email.utils import format_datetime
+        response = self.response(429, format_datetime(datetime.now(timezone.utc) + timedelta(seconds=90)))
+        delay = publisher.retry_after_seconds(response, 5)
+        self.assertGreater(delay, 88)
+        self.assertLessEqual(delay, 90)
+
+    def test_invalid_retry_after_uses_backoff_and_very_long_wait_fails(self):
+        self.assertEqual(publisher.retry_after_seconds(self.response(429, 'invalid'), 15), 15)
+        with self.assertRaisesRegex(RuntimeError, 'longer than five minutes'):
+            publisher.retry_after_seconds(self.response(429, '1200'), 5)
+
+    def test_permissions_errors_are_not_retried(self):
+        with patch.object(publisher.requests, 'get', return_value=self.response(403)) as get:
+            with self.assertRaises(publisher.requests.HTTPError):
+                publisher.wp_get('posts')
+        get.assert_called_once()
+        self.sleep.assert_not_called()
+
+    def test_network_failures_exhaust_only_bounded_read_retries(self):
+        with patch.object(publisher.requests, 'get', side_effect=publisher.requests.Timeout()) as get:
+            with self.assertRaises(publisher.requests.Timeout):
+                publisher.wp_get('posts')
+        self.assertEqual(get.call_count, 5)
+        self.assertEqual([c.args[0] for c in self.sleep.call_args_list], [5, 15, 30, 60])
+
+    def test_write_is_paced_but_never_retried(self):
+        with patch.object(publisher.requests, 'post', side_effect=publisher.requests.Timeout()) as post:
+            with self.assertRaises(publisher.requests.Timeout):
+                publisher.wp_post('posts', {'title': 'Example'})
+        self.pace.assert_called_once()
+        post.assert_called_once()
+        self.sleep.assert_not_called()
+
+
+class WordPressPacingTests(unittest.TestCase):
+    def test_requests_share_minimum_start_interval(self):
+        with patch.object(publisher, '_last_wp_request', None), \
+                patch.object(publisher.time, 'monotonic', side_effect=[10, 10.5, 10.5]), \
+                patch.object(publisher.time, 'sleep') as sleep:
+            publisher.pace_wordpress()
+            publisher.pace_wordpress()
+        sleep.assert_called_once_with(1)
+
+
 if __name__ == '__main__':
     unittest.main()

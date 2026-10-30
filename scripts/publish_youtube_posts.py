@@ -1,10 +1,12 @@
 """Reconcile the channel's public uploads with WordPress Motion posts."""
 import argparse
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import html
 import os
 import re
 import sys
+import time
 
 import requests
 
@@ -20,6 +22,9 @@ TARGETS = [
     },
 ]
 POST_STATUSES = "publish,draft,private,future,pending"
+WP_RETRY_DELAYS = (5, 15, 30, 60)
+WP_REQUEST_INTERVAL = 1.5
+_last_wp_request = None
 VIDEO_URL_PATTERN = re.compile(
     r"(?:https?:)?//(?:www\.|m\.)?(?:"
     r"youtube(?:-nocookie)?\.com/(?:watch\?[^\s\"'<>]*?v=|embed/|shorts/|live/)"
@@ -35,19 +40,58 @@ def env(name: str) -> str:
     return value.rstrip("/") if name.endswith("URL") else value
 
 
+def pace_wordpress() -> None:
+    global _last_wp_request
+    if _last_wp_request is not None:
+        remaining = WP_REQUEST_INTERVAL - (time.monotonic() - _last_wp_request)
+        if remaining > 0:
+            time.sleep(remaining)
+    _last_wp_request = time.monotonic()
+
+
+def retry_after_seconds(response, default: int) -> float:
+    value = response.headers.get("Retry-After", "") if response is not None else ""
+    try:
+        delay = float(value)
+    except ValueError:
+        try:
+            delay = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
+        except (ValueError, TypeError, OverflowError):
+            delay = default
+    # A very long rate limit should fail visibly for a later scheduled run.
+    if delay > 300:
+        raise RuntimeError("WordPress requests a retry delay longer than five minutes")
+    return max(default, delay)
+
+
 def wp_get(endpoint: str, params: dict | None = None):
-    response = requests.get(
-        f"{env('WP_BASE_URL')}/wp-json/wp/v2/{endpoint.lstrip('/')}",
-        params=params,
-        auth=(env("WP_USERNAME"), env("WP_APP_PASSWORD")),
-        timeout=(10, 30),
-    )
-    response.raise_for_status()
-    return response.json()
+    for attempt in range(len(WP_RETRY_DELAYS) + 1):
+        pace_wordpress()
+        try:
+            response = requests.get(
+                f"{env('WP_BASE_URL')}/wp-json/wp/v2/{endpoint.lstrip('/')}",
+                params=params,
+                auth=(env("WP_USERNAME"), env("WP_APP_PASSWORD")),
+                timeout=(10, 30),
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as error:
+            response = getattr(error, "response", None)
+            status = response.status_code if response is not None else None
+            if status is not None and status not in {408, 429} and not 500 <= status < 600:
+                raise
+            if attempt == len(WP_RETRY_DELAYS):
+                raise
+            delay = retry_after_seconds(response, WP_RETRY_DELAYS[attempt])
+            print(f"WordPress read {status or type(error).__name__}; retrying in {delay:g}s.", flush=True)
+            time.sleep(delay)
+    raise RuntimeError("WordPress read exhausted retries")
 
 
 def wp_post(endpoint: str, payload: dict):
     # A timed-out write may already have succeeded; never replay a POST blindly.
+    pace_wordpress()
     response = requests.post(
         f"{env('WP_BASE_URL')}/wp-json/wp/v2/{endpoint.lstrip('/')}",
         json=payload,

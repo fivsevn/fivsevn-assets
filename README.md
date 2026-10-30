@@ -128,6 +128,7 @@ python scripts/publish_youtube_posts.py --dry-run
 * Hashtags in YouTube titles become WordPress tags and are removed from the article title.
 * YouTube Shorts URLs are normalized into regular `watch?v=` URLs. The video stays on YouTube; WordPress stores the embed block.
 * YouTube page layouts and channel identity are validated. Incomplete reads or invalid metadata fail the run visibly before publishing; no extra API key or third-party mirror is used.
+* WordPress requests share a 1.5-second minimum start interval. GET requests retry transient failures up to four times with 5/15/30/60-second backoff, honoring `Retry-After` seconds or dates. A requested wait longer than five minutes fails visibly for a later run.
 * WordPress writes are not automatically retried. Later runs check existing video IDs and slugs again, so they can continue after a partially completed run without republishing successful posts.
 
 
