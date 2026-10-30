@@ -34,6 +34,13 @@ jobs:
       - name: Verify image publishing targets
         run: python -m unittest discover -s tests -p 'test_image_posts.py' -v
 
+      - name: Retire the verified Fieldlog WordPress copy
+        env:
+          WP_BASE_URL: ${{ secrets.WP_BASE_URL }}
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+        run: python scripts/retire_fieldlog_wordpress.py
+
       - name: Publish image posts
         env:
           WP_BASE_URL: ${{ secrets.WP_BASE_URL }}
