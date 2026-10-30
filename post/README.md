@@ -1,11 +1,9 @@
 # post
 
-本目录只保留 `2025/`、`2026/` 等旧图片存档。
+本目录保存 `2025/`、`2026/` 等文章配图存档，不作为 Flux、Savour 或 Fieldlog 的发布入口。
 
-flux 图片已统一迁入 **[fivsevn-flux/uploads/](https://github.com/fivsevn/fivsevn-flux/tree/main/uploads)**。原 `post/flux/` 的 19 张图片已按原文件名迁移并逐字节核对，旧帖继续使用 flux 文章包内的图片。这里不再作为 flux 上传或发布入口。
+- **Flux**：在 [fivsevn-flux](https://github.com/fivsevn/fivsevn-flux) 发布，图片入口是 [`trigger_imgs/`](https://github.com/fivsevn/fivsevn-flux/tree/main/trigger_imgs)，文字入口是 [`trigger_text.md`](https://github.com/fivsevn/fivsevn-flux/blob/main/trigger_text.md)。
+- **Savour**：在 [fivsevn-savour](https://github.com/fivsevn/fivsevn-savour) 的 [`trigger_imgs/`](https://github.com/fivsevn/fivsevn-savour/tree/main/trigger_imgs) 发布。
+- **Fieldlog**：在 [fivsevn-devlog](https://github.com/fivsevn-agy/fivsevn-devlog) 的 [`natsci/fieldlog/trigger_imgs/`](https://github.com/fivsevn-agy/fivsevn-devlog/tree/main/natsci/fieldlog/trigger_imgs) 发布。
 
-手机快捷指令的 flux 分支，请把“存储文件”目标改为 **fivsevn-flux 仓库 → uploads/ 目录**；分支中如有提交或推送动作，也改用该仓库。先在 Working Copy 拉取最新版本。其他栏目分支照常使用 assets。
-
-`docs/` 中的旧签名快捷指令只作历史备份，不要重新导入其旧路径。
-
-[完整发布、修改和删除说明](https://github.com/fivsevn-agy/fivsevn-devlog/blob/main/posts/README.md#1-短内容flux)
+手机快捷指令和 Working Copy 按各板块当前 README 配置对应仓库与入口，上传前先拉取最新 `main`。本目录原有文章配图仍可能被使用，删除前检查引用。

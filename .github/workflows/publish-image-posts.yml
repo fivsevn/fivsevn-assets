@@ -5,8 +5,10 @@ on:
     branches:
       - main
     paths:
-      - "natsci/fieldlog/**"
       - "stills/bygone/**"
+      - "scripts/publish_image_posts.py"
+      - "tests/test_image_posts.py"
+      - ".github/workflows/publish-image-posts.yml"
 
 permissions:
   contents: read
@@ -28,6 +30,9 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests
+
+      - name: Verify image publishing targets
+        run: python -m unittest discover -s tests -p 'test_image_posts.py' -v
 
       - name: Publish image posts
         env:

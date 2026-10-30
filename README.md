@@ -1,6 +1,6 @@
 # fivsevn-assets
 
-- A repository for storing images and assets used in my blog: fivsevn.com
+Static images and shared assets used by [fivsevn.com](https://fivsevn.com/), plus the current Bygone image and YouTube publishing automations.
 
 ---
 ## update log
@@ -19,157 +19,61 @@
 ---
 ## repository structure
 
-- This repository stores static assets for fivsevn.com and related surfaces.
-
 ```text
 fivsevn-assets/
-├── homepage/
-│   ├── ...
-│   ├── homepage20251101head.webp
-│   ├── homepage20251105bio.webp
-│   └── homepage20260531motion.webp
-├── avatar/
-│   ├── ...
-│   ├── avatar202511main512.png
-│   ├── avatar20260225whow.webp
-│   └── avatar202603fragment169.webp
-├── common/
-│   ├── ...
-│   └── icon/
-│       ├── ...
-│       ├── discord.png
-│       └── youtube.png
-├── pages/
-│   ├── ...
-│   └── 57store/
-│       ├── ...
-│       ├── 57store20260224f.webp
-│       └── 57store20260224p.webp
-├── natsci/
-│   └── fieldlog/
-│       ├── ...
-│       ├── IMG_6852.JPG
-│       └── IMG_6856.JPG
-├── post/
-│   ├── 2026/
-│   │   └── 202605/
-│   │       ├── ...
-│   │       ├── IMG_6880.JPG
-│   │       └── IMG_6885.PNG
-│   └── 2025/
-│       ├── 202504/
-│       │   ├── ...
-│       │   ├── 20250403pigpdevlog.jpeg
-│       │   └── 20250421concreteutilitypole1.jpg
-│       └── 202503/
-│           ├── ...
-│           ├── 20250313poirotgoestoegyptalexandria.JPG
-│           └── 20250331corpus.jpeg
-├── stills/
-│   ├── ...
-│   ├── bygone/
-│   │   └── ...
-│   └── 20190406originalfivsevn/
-│       └── ...
+├── homepage/                    Shared homepage images
+├── avatar/                      Avatar assets
+├── common/                      Common images and icons
+├── pages/                       Assets for individual pages
+├── post/                        Dated article-image archives
+├── stills/                      Photography assets
+│   └── bygone/                  Current WordPress image publishing input
+├── docs/                        Saved shortcut file
 ├── scripts/
-│   ├── ...
 │   ├── publish_image_posts.py
 │   └── publish_youtube_posts.py
-└── .github/
-    ├── ...
-    └── workflows/
-        ├── ...
-        ├── publish-image-posts.yml
-        └── publish-youtube-posts.yml
+├── tests/                       Offline publishing checks
+└── .github/workflows/
+    ├── publish-image-posts.yml
+    └── publish-youtube-posts.yml
 ```
+
+## independent boards
+
+These boards own their content, upload inputs, and GitHub Pages publishing. They do not use this repository as a publishing input.
+
+| Board | Content repository | Image input | Public page |
+|---|---|---|---|
+| Flux | [fivsevn-flux](https://github.com/fivsevn/fivsevn-flux) | [`trigger_imgs/`](https://github.com/fivsevn/fivsevn-flux/tree/main/trigger_imgs) | [flux.fivsevn.com](https://flux.fivsevn.com/) |
+| Savour | [fivsevn-savour](https://github.com/fivsevn/fivsevn-savour) | [`trigger_imgs/`](https://github.com/fivsevn/fivsevn-savour/tree/main/trigger_imgs) | [savour.fivsevn.com](https://savour.fivsevn.com/) |
+| Fieldlog | [fivsevn-devlog](https://github.com/fivsevn-agy/fivsevn-devlog) | [`natsci/fieldlog/trigger_imgs/`](https://github.com/fivsevn-agy/fivsevn-devlog/tree/main/natsci/fieldlog/trigger_imgs) | [devlog.fivsevn.com/natsci/fieldlog/](https://devlog.fivsevn.com/natsci/fieldlog/) |
+
+Use each board's current README when configuring Working Copy or a phone shortcut. The saved signed shortcut in `docs/` is not the current configuration guide for these independent boards.
 
 ---
 ## image post automation
 
-- Some folders in this repository are used as image inboxes.
+The current image publishing target is **`stills/bygone/` only**. Flux, Savour, and Fieldlog uploads are ignored by this publisher.
 
-- When new image files are pushed into these folders, GitHub Actions will create WordPress posts automatically.
+| GitHub folder | WordPress category | WordPress tags | Title | Post content |
+|---|---|---|---|---|
+| `stills/bygone/` | `bygone` | none | Filename, with underscores and hyphens replaced by spaces | One native WordPress image block |
 
-- Supported image types:
+Supported inputs are `.jpg`, `.jpeg`, `.png`, `.webp`, and `.gif`, with case-insensitive extensions. Images remain in this repository and are referenced through `CDN_BASE_URL`; they are not uploaded into the WordPress Media Library.
 
-```text
-.jpg / .jpeg / .png / .webp / .gif
-```
+The two maintained files are [`.github/workflows/publish-image-posts.yml`](.github/workflows/publish-image-posts.yml) and [`scripts/publish_image_posts.py`](scripts/publish_image_posts.py). The workflow starts for Bygone image changes or changes to the publisher, its tests, or the workflow itself. It checks out complete Git history, installs `requests`, runs offline target/payload tests, then runs the publisher.
 
-### current rules
+The publisher reads `WP_BASE_URL`, `WP_USERNAME`, `WP_APP_PASSWORD`, and `CDN_BASE_URL`, together with the event's `GITHUB_BEFORE` and `GITHUB_SHA`. `TITLE_TIMEZONE` is retained as an optional setting for the generic commit-time title helper; the current Bygone target uses filenames.
 
-| GitHub folder | WordPress category | WordPress tags | Post content |
-|---|---|---|---|
-| `natsci/fieldlog/` | `fieldlog` | none | one image block + optional paragraph blocks from commit extended description |
+Publishing steps:
 
-| `stills/bygone/` | `bygone` | none | one image block |
+1. Read changed paths between the push's before and after commits.
+2. Keep existing supported images inside `stills/bygone/`.
+3. Build the filename title, CDN image URL, and stable path-derived post slug.
+4. Skip a post when that slug already exists.
+5. Resolve the `bygone` category and create a published WordPress post containing its native image block.
 
-### how it works
-
-- The automation is split into two files:
-
-```text
-.github/workflows/publish-image-posts.yml  
-scripts/publish_image_posts.py  
-```
-
-- The workflow runs on pushes to main, but only when files under these paths change:
-
-```text
-natsci/fieldlog/**  
-stills/bygone/**  
-```
-
-- The workflow checks out the repository with full Git history, sets up Python 3.11, installs requests, and then runs:
-
-```text
-python scripts/publish_image_posts.py  
-```
-
-- The script reads the following GitHub Actions secrets / environment variables:
-
-```text
-WP_BASE_URL  
-WP_USERNAME  
-WP_APP_PASSWORD  
-CDN_BASE_URL  
-TITLE_TIMEZONE  
-GITHUB_BEFORE  
-GITHUB_SHA  
-```
-
-### Basic publishing flow
-
-1. Detect changed files between GITHUB_BEFORE and GITHUB_SHA.
-2. Keep only supported image files inside configured target folders.
-3. Match each image path to its WordPress category, tags, and optional image class.
-4. Read the image file’s latest commit time.
-5. Use that commit time as the WordPress post title, formatted like:
-
-```
-06 Jun, 2026 05:51  
-```
-
-6. Build the image URL from CDN_BASE_URL plus the repository path.
-7. Generate a stable WordPress slug from the image path.
-8. For `natsci/fieldlog/`, read the commit extended description and append it below the image as native WordPress paragraph blocks.
-9. Skip publishing if a post with the same slug already exists.
-10. Resolve the WordPress category by slug.
-11. Find or create required WordPress tags.
-12. Create a published WordPress post through the WordPress REST API.
-
-### notes
-
-* Each uploaded image becomes one separate WordPress post.
-* The post title uses the image commit time, formatted like 06 Jun, 2026 05:51.
-* The image itself stays in this GitHub repository and is inserted into WordPress through the CDN URL.
-* WordPress does not upload the image into the Media Library.
-* The generated content is a native WordPress image block.
-* `natsci/fieldlog/` can append text below the image from the commit extended description.
-* `natsci/fieldlog/` text is generated as native WordPress paragraph blocks, not plain HTML.
-* fieldlog and bygone images use the default WordPress image block style.
-* bygone image titles are generated from filenames.
-* Duplicate publishing is prevented by checking whether a WordPress post with the generated slug already exists.
+Deleting an asset does not delete a WordPress post. Edit or remove existing Bygone posts in WordPress, and retain their referenced media while they remain in use.
 
 ---
 ## YouTube post automation
@@ -245,111 +149,15 @@ youtube-VIDEO_ID
 * If both sources fail, reads are retried up to four rounds, with waits of 5, 15, and 30 seconds. Exhausted retries fail the run visibly; they are not treated as successful synchronization. The public-page fallback depends on YouTube's page structure; the offline tests cover the supported layouts.
 * Scheduled and manual YouTube runs are serialized to avoid concurrent duplicate posts. WordPress writes are not automatically retried. The hourly schedule, latest-video rule, category, title tags, and embed format are unchanged.
 
+
 ---
 ## editing note
 
-- ⚠️ 自动化发布到 WordPress 时，脚本不是直接塞普通 HTML，而是生成 WordPress / Gutenberg 识别的 block markup，比如 image block、paragraph block 和 YouTube embed block；这样图片尺寸更好控制，视频嵌入效果也比手写 HTML 更稳定，后续最好继续用 WordPress 区块编辑器修改。
+The current WordPress automations create Gutenberg block markup: an image block for Bygone and a YouTube embed block for Motion. Later edits should preserve those block structures, preferably through the WordPress block editor.
 
-The automation writes WordPress block markup directly into the `content` field of the WordPress REST API payload.
+For local offline checks:
 
-For image posts, the script uses native WordPress image and paragraph blocks instead of plain HTML:
-
-```python
-def make_image_block(image_url: str, title: str, image_class: str) -> str:
-    escaped_url = html.escape(image_url, quote=True)
-    escaped_title = html.escape(title, quote=True)
-    escaped_class = html.escape(image_class, quote=True)
-
-    if image_class:
-        return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none","className":"{escaped_class}"}} -->
-<figure class="wp-block-image {escaped_class}">
-  <img src="{escaped_url}" alt="{escaped_title}" />
-</figure>
-<!-- /wp:image -->'''
-
-    return f'''<!-- wp:image {{"url":"{escaped_url}","alt":"{escaped_title}","linkDestination":"none"}} -->
-<figure class="wp-block-image">
-  <img src="{escaped_url}" alt="{escaped_title}" />
-</figure>
-<!-- /wp:image -->'''
+```sh
+python -m pip install requests feedparser
+python -m unittest discover -s tests -v
 ```
-
-For `natsci/fieldlog/`, when the commit has an extended description, the script appends it below the image as native paragraph blocks:
-
-```python
-def make_paragraph_blocks(text: str) -> str:
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    blocks = []
-
-    for paragraph in paragraphs:
-        escaped = html.escape(paragraph, quote=True).replace("\n", "<br>")
-        blocks.append(f"""<!-- wp:paragraph -->
-<p>{escaped}</p>
-<!-- /wp:paragraph -->""")
-
-    return "\n\n".join(blocks)
-```
-
-For YouTube posts, the script uses a native WordPress YouTube embed block:
-
-```python
-def make_youtube_embed_block(video_url: str) -> str:
-    escaped_url = html.escape(video_url, quote=True)
-
-    return f"""
-<!-- wp:embed {{"url":"{escaped_url}","type":"video","providerNameSlug":"youtube","responsive":false}} -->
-<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube">
-<div class="wp-block-embed__wrapper">
-{escaped_url}
-</div>
-</figure>
-<!-- /wp:embed -->
-""".strip()
-```
-
-These blocks are then passed into the WordPress post payload as `content`:
-
-```python
-image_block = make_image_block(image_url, title, image_class)
-
-commit_body = ""
-if config.get("content_from_commit_body"):
-    commit_body = get_commit_body(path)
-
-if commit_body:
-    content = f"{image_block}\n\n{make_paragraph_blocks(commit_body)}"
-else:
-    content = image_block
-
-payload = {
-    "status": "publish",
-    "title": title,
-    "slug": slug,
-    "content": content,
-    "categories": [category_id],
-}
-```
-
-```python
-content = make_youtube_embed_block(video_url)
-
-payload = {
-    "status": "publish",
-    "title": title,
-    "slug": slug,
-    "content": content,
-    "categories": [category_id],
-    "format": "video",
-}
-```
-
-This means the automation is not simply inserting raw HTML. It is creating image, paragraph, and embed content in the same block format that WordPress / Gutenberg expects.
-
-This is important because:
-
-* Image size and layout are easier to control when the image is a WordPress image block.
-* `natsci/fieldlog/` text remains editable as native WordPress paragraph blocks.
-* YouTube videos render more reliably as native YouTube embed blocks than as manually written HTML embeds.
-* Later edits should be made in the WordPress block editor / Gutenberg editor, so the generated block structure is preserved.
-* Manually rewriting the generated markup as plain HTML may break the expected block structure or make later visual editing less predictable.
-

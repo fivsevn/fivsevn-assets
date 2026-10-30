@@ -12,14 +12,8 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 # 不同目录对应不同 WordPress 分类、tags、图片 class。
 # category_slug 对应 WordPress 后台里的 slug。
 # image_class 为空时，不额外加 class，走 WordPress 默认 image block 样式。
-# Flux publishing is handled by fivsevn-flux; no flux folder is a WordPress target.
+# Only Bygone images are published by this workflow.
 TARGETS = {
-    "natsci/fieldlog": {
-        "category_slug": "fieldlog",
-        "tags": [],
-        "image_class": "",
-        "content_from_commit_body": True,
-    },
     "stills/bygone": {
         "category_slug": "bygone",
         "tags": [],
@@ -256,34 +250,6 @@ def make_image_block(image_url: str, title: str, image_class: str) -> str:
 <!-- /wp:image -->'''
 
 
-def get_commit_body(path: str) -> str:
-    message = run_git(["log", "-1", "--format=%B", "--", path]).strip()
-    lines = message.splitlines()
-
-    if len(lines) <= 1:
-        return ""
-
-    body_lines = lines[1:]
-
-    while body_lines and not body_lines[0].strip():
-        body_lines.pop(0)
-
-    return "\n".join(body_lines).strip()
-
-
-def make_paragraph_blocks(text: str) -> str:
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    blocks = []
-
-    for paragraph in paragraphs:
-        escaped = html.escape(paragraph, quote=True).replace("\n", "<br>")
-        blocks.append(f'''<!-- wp:paragraph -->
-<p>{escaped}</p>
-<!-- /wp:paragraph -->''')
-
-    return "\n\n".join(blocks)
-
-
 def publish_image(
     path: str,
     category_cache: dict[str, int],
@@ -324,20 +290,11 @@ def publish_image(
 
     image_block = make_image_block(image_url, title, image_class)
 
-    commit_body = ""
-    if config.get("content_from_commit_body"):
-        commit_body = get_commit_body(path)
-
-    if commit_body:
-        content = f"{image_block}\n\n{make_paragraph_blocks(commit_body)}"
-    else:
-        content = image_block
-
     payload = {
         "status": "publish",
         "title": title,
         "slug": slug,
-        "content": content,
+        "content": image_block,
         "categories": [category_id],
     }
 
