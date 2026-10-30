@@ -170,6 +170,32 @@ class CatalogTests(unittest.TestCase):
             source._assigned_json("<html>consent</html>", "ytInitialData")
 
 
+class PageRecoveryTests(unittest.TestCase):
+    def test_http_200_shell_is_retried_before_reading_complete_catalog(self):
+        with patch.object(source, "_request", side_effect=[response('<html>temporary error</html>'), response(page([video()]))]) as request, \
+                patch.object(source.time, "sleep") as sleep, patch.object(source, "_rss_videos", return_value=[]):
+            result = source.get_channel_videos(CHANNEL, 'example')
+        self.assertEqual([v.video_id for v in result], [FIRST])
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(5)
+
+    def test_persistent_shell_fails_after_bounded_attempts(self):
+        with patch.object(source, "_request", return_value=response('<html>consent</html>')) as request, \
+                patch.object(source.time, "sleep") as sleep, self.assertRaises(ValueError):
+            source.get_channel_videos(CHANNEL, 'example')
+        self.assertEqual(request.call_count, 4)
+        self.assertEqual([c.args[0] for c in sleep.call_args_list], [5, 15, 30])
+
+    def test_watch_shell_without_details_is_retried_without_claiming_wrong_channel(self):
+        empty_player = '<script>var ytInitialPlayerResponse = {"playabilityStatus":{"status":"ERROR"}};</script>'
+        with patch.object(source, "_request", side_effect=[response(empty_player), response(watch())]) as request, \
+                patch.object(source.time, "sleep") as sleep:
+            result = source.get_video_metadata(FIRST, CHANNEL)
+        self.assertEqual(result.video_id, FIRST)
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(5)
+
+
 class RssTests(unittest.TestCase):
     def test_real_feed_omits_uc_only_at_feed_level_and_all_entries_get_dates(self):
         for top in [CHANNEL[2:], CHANNEL]:

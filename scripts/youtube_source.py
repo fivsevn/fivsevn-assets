@@ -67,6 +67,24 @@ def _assigned_json(document, variable):
     return value
 
 
+
+def _read_page(url, variable, *, required_key=None, **kwargs):
+    """Retry HTTP-200 consent/error shells that contain no usable page data."""
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        response = _request("get", url, **kwargs)
+        try:
+            data = _assigned_json(response.text, variable)
+            if required_key and (not isinstance(data.get(required_key), dict) or not data[required_key]):
+                raise ValueError(f"YouTube page has no {required_key}")
+            return response.text, data
+        except ValueError as error:
+            if attempt == len(RETRY_DELAYS):
+                raise
+            delay = RETRY_DELAYS[attempt]
+            print(f"YouTube page data unavailable ({error}); retrying in {delay}s.", flush=True)
+            time.sleep(delay)
+    raise RuntimeError("YouTube page data exhausted retries")
+
 def _config(document):
     config = {}
     # The first ytcfg.set(...) occurrence may be its function definition.
@@ -201,8 +219,8 @@ def _get_catalog(channel_id):
     playlist_id = "UU" + channel_id[2:]
     page_url = "https://www.youtube.com/playlist?list=" + playlist_id + "&hl=en"
     headers = {"User-Agent": USER_AGENT, "Accept": "text/html"}
-    document = _request("get", page_url, headers=headers).text
-    videos, token = _initial_items(_assigned_json(document, "ytInitialData"), channel_id)
+    document, initial_data = _read_page(page_url, "ytInitialData", headers=headers)
+    videos, token = _initial_items(initial_data, channel_id)
     catalogue = {video.video_id: video for video in videos}
     config, seen_tokens = _config(document), set()
     for page in range(1, MAX_PAGES + 1):
@@ -292,15 +310,15 @@ def get_channel_videos(channel_id: str, target_name: str) -> list[Video]:
 def get_video_metadata(video_id: str, channel_id: str) -> Video:
     """Read a missing upload's exact original publication time from its watch page."""
     _video("validate", video_id)
-    response = _request(
-        "get", "https://www.youtube.com/watch", params={"v": video_id, "hl": "en"},
+    _, data = _read_page(
+        "https://www.youtube.com/watch", "ytInitialPlayerResponse", required_key="videoDetails",
+        params={"v": video_id, "hl": "en"},
         headers={"User-Agent": USER_AGENT, "Accept": "text/html"},
     )
-    data = _assigned_json(response.text, "ytInitialPlayerResponse")
     details = data.get("videoDetails", {})
     microformat = data.get("microformat", {}).get("playerMicroformatRenderer", {})
     if details.get("videoId") != video_id or details.get("channelId") != channel_id:
-        raise IdentityError("YouTube watch metadata does not match the requested video and channel")
+        raise IdentityError(f"YouTube watch metadata does not match requested video {video_id} and channel")
     if microformat.get("externalVideoId", video_id) != video_id or microformat.get("externalChannelId", channel_id) != channel_id:
         raise IdentityError("YouTube watch microformat belongs to another video or channel")
     if details.get("isPrivate") or microformat.get("isUnlisted"):
