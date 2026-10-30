@@ -2,6 +2,7 @@
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from html.parser import HTMLParser
+from pathlib import Path
 import json
 import re
 import time
@@ -15,6 +16,7 @@ TIMEOUT = (10, 30)
 RETRY_DELAYS = (5, 15, 30)
 MAX_PAGES = 1000
 USER_AGENT = "Mozilla/5.0 (compatible; fivsevn-youtube-sync/2.0)"
+BACKFILL_PATH = Path(__file__).with_name("youtube_backfill.json")
 
 
 @dataclass(frozen=True)
@@ -291,6 +293,22 @@ def _rss_videos(channel_id):
     return videos
 
 
+
+def _backfill_videos(channel_id):
+    """Exact dates verified from official pages for the historical catch-up."""
+    if not BACKFILL_PATH.exists():
+        return {}
+    record = json.loads(BACKFILL_PATH.read_text())
+    if record.get("channel_id") != channel_id:
+        return {}
+    result = {}
+    for item in record.get("videos", []):
+        video = _video(item.get("title"), item.get("video_id"), _timestamp(item.get("published_at")))
+        if video.video_id in result:
+            raise ValueError("Duplicate video in verified YouTube backfill metadata")
+        result[video.video_id] = video
+    return result
+
 def get_channel_videos(channel_id: str, target_name: str) -> list[Video]:
     """Return every public upload, newest first, with RSS dates when available."""
     if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id):
@@ -303,7 +321,10 @@ def get_channel_videos(channel_id: str, target_name: str) -> list[Video]:
     except (requests.RequestException, ValueError) as error:
         print(f"YouTube RSS [{target_name}] unavailable ({type(error).__name__}); using verified uploads and watch dates.", flush=True)
         dated = {}
-    result = [replace(video, published_at=dated[video.video_id].published_at) if video.video_id in dated else video for video in catalogue]
+    # A seeded date only applies to videos still in this verified public catalogue.
+    dates = _backfill_videos(channel_id)
+    dates.update(dated)
+    result = [replace(video, published_at=dates[video.video_id].published_at) if video.video_id in dates else video for video in catalogue]
     print(f"Read {len(result)} verified public YouTube uploads [{target_name}].", flush=True)
     return result
 
@@ -370,8 +391,12 @@ def get_video_metadata(video_id: str, channel_id: str) -> Video:
     """Read a missing upload's verified original time, even if playback is limited."""
     _video("validate", video_id)
     for attempt in range(len(RETRY_DELAYS) + 1):
+        # The official Shorts route exposes the same verified page metadata and
+        # can remain available when the regular watch route is playback-limited.
+        url = "https://www.youtube.com/watch" if attempt % 2 == 0 else f"https://www.youtube.com/shorts/{video_id}"
+        params = {"v": video_id, "hl": "en"} if attempt % 2 == 0 else {"hl": "en"}
         response = _request(
-            "get", "https://www.youtube.com/watch", params={"v": video_id, "hl": "en"},
+            "get", url, params=params,
             headers={"User-Agent": USER_AGENT, "Accept": "text/html"},
         )
         try:

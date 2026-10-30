@@ -233,6 +233,39 @@ class RssTests(unittest.TestCase):
             source.get_channel_videos(CHANNEL, "example")
 
 
+class BackfillMetadataTests(unittest.TestCase):
+    def test_verified_dates_are_channel_scoped(self):
+        record = {'channel_id': CHANNEL, 'videos': [{'video_id': FIRST, 'title': 'Verified', 'published_at': '2026-09-29T09:27:38-07:00'}]}
+        path = Mock()
+        path.exists.return_value = True
+        path.read_text.return_value = json.dumps(record)
+        with patch.object(source, 'BACKFILL_PATH', path):
+            self.assertEqual(source._backfill_videos(CHANNEL)[FIRST].published_at, '2026-09-29T16:27:38+00:00')
+            self.assertEqual(source._backfill_videos(OTHER_CHANNEL), {})
+
+    def test_seed_only_enriches_public_catalog_and_fresh_rss_wins(self):
+        seeded = {FIRST: source.Video('Old seed title', FIRST, '2026-09-29T16:27:38Z'),
+                  SECOND: source.Video('Seed second', SECOND, '2026-09-29T16:27:39Z'),
+                  THIRD: source.Video('Not publicly listed', THIRD, '2026-09-29T16:27:40Z')}
+        with patch.object(source, '_get_catalog', return_value=[source.Video('Current title', FIRST), source.Video('Second', SECOND)]), \
+                patch.object(source, '_backfill_videos', return_value=seeded), \
+                patch.object(source, '_rss_videos', return_value=[source.Video('RSS', SECOND, '2026-10-30T06:23:27Z')]):
+            result = source.get_channel_videos(CHANNEL, 'example')
+        self.assertEqual([v.video_id for v in result], [FIRST, SECOND])
+        self.assertEqual(result[0].title, 'Current title')
+        self.assertEqual(result[0].published_at, '2026-09-29T16:27:38Z')
+        self.assertEqual(result[1].published_at, '2026-10-30T06:23:27Z')
+
+    def test_checked_in_backfill_has_eleven_unique_exact_dates_and_official_sources(self):
+        record = json.loads(source.BACKFILL_PATH.read_text())
+        self.assertEqual(len(record['videos']), 11)
+        self.assertEqual(len({v['video_id'] for v in record['videos']}), 11)
+        for video in record['videos']:
+            self.assertEqual(video['source'], 'https://www.youtube.com/watch?v=' + video['video_id'])
+            source._timestamp(video['published_at'])
+        self.assertEqual(len(source._backfill_videos(record['channel_id'])), 11)
+
+
 class WatchTests(unittest.TestCase):
     def setUp(self):
         patch.object(source.time, "sleep").start()

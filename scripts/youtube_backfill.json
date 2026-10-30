@@ -1,0 +1,73 @@
+{
+  "channel_id": "UCIUoYaFm5uRLY9DEcdFG-VQ",
+  "verified_at": "2026-10-30T15:27:37.247768+00:00",
+  "verification": "Original exact timestamps independently checked against official YouTube watch pages and available RSS entries on 2026-10-30. Used only for IDs still present in the configured channel public uploads catalogue.",
+  "videos": [
+    {
+      "video_id": "zSNTF5NycfU",
+      "title": "五月七日のみちくさ",
+      "published_at": "2026-10-30T15:17:09+00:00",
+      "source": "https://www.youtube.com/watch?v=zSNTF5NycfU"
+    },
+    {
+      "video_id": "R3uCsxIEuH4",
+      "title": "五月七日のみちくさ",
+      "published_at": "2026-10-30T11:20:59+00:00",
+      "source": "https://www.youtube.com/watch?v=R3uCsxIEuH4"
+    },
+    {
+      "video_id": "z_fAyKeKOWI",
+      "title": "The One Shirt Theory Day 10 Results",
+      "published_at": "2026-10-30T06:23:27+00:00",
+      "source": "https://www.youtube.com/watch?v=z_fAyKeKOWI"
+    },
+    {
+      "video_id": "G8mMA6le1lU",
+      "title": "The One Shirt Theory 20",
+      "published_at": "2026-10-29T16:09:07+00:00",
+      "source": "https://www.youtube.com/watch?v=G8mMA6le1lU"
+    },
+    {
+      "video_id": "ozao_FhyTXA",
+      "title": "五月七日のみちくさ",
+      "published_at": "2026-10-29T10:49:44+00:00",
+      "source": "https://www.youtube.com/watch?v=ozao_FhyTXA"
+    },
+    {
+      "video_id": "KYCsFlEeUzE",
+      "title": "The One Shirt Theory Day 8 Results",
+      "published_at": "2026-10-26T16:40:46+00:00",
+      "source": "https://www.youtube.com/watch?v=KYCsFlEeUzE"
+    },
+    {
+      "video_id": "MR6-yZb_SYA",
+      "title": "五月七日のみちくさ",
+      "published_at": "2026-10-25T15:49:22+00:00",
+      "source": "https://www.youtube.com/watch?v=MR6-yZb_SYA"
+    },
+    {
+      "video_id": "Rx6a3LdMtdQ",
+      "title": "The One Shirt Theory 16",
+      "published_at": "2026-10-25T05:12:20+00:00",
+      "source": "https://www.youtube.com/watch?v=Rx6a3LdMtdQ"
+    },
+    {
+      "video_id": "9JE8JzETRpg",
+      "title": "The One Shirt Theory Day 7 Results",
+      "published_at": "2026-10-24T13:23:23+00:00",
+      "source": "https://www.youtube.com/watch?v=9JE8JzETRpg"
+    },
+    {
+      "video_id": "5LGELeWmbnk",
+      "title": "The One Shirt Theory 01",
+      "published_at": "2026-09-29T09:27:56-07:00",
+      "source": "https://www.youtube.com/watch?v=5LGELeWmbnk"
+    },
+    {
+      "video_id": "ClY4WqtkUYo",
+      "title": "The One Shirt Theory 00",
+      "published_at": "2026-09-29T09:27:38-07:00",
+      "source": "https://www.youtube.com/watch?v=ClY4WqtkUYo"
+    }
+  ]
+}

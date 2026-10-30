@@ -124,6 +124,8 @@ python scripts/publish_youtube_posts.py --dry-run
 
 ### notes
 
+* [`scripts/youtube_backfill.json`](scripts/youtube_backfill.json) retains the exact original dates independently verified on the official YouTube pages for the 11-video backlog on 2026-10-30. These dates only apply to IDs still present in the configured channel's verified public uploads list; fresh RSS dates take precedence. This lets historical catch-up finish when cloud playback metadata is restricted.
+* Watch metadata retries alternate between the official watch and Shorts page routes, with the same video and owner verification.
 * Multiple videos with the same title are distinct uploads and are matched by video ID.
 * Hashtags in YouTube titles become WordPress tags and are removed from the article title.
 * YouTube Shorts URLs are normalized into regular `watch?v=` URLs. The video stays on YouTube; WordPress stores the embed block.
