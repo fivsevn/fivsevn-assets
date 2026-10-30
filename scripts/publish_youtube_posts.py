@@ -1,12 +1,14 @@
+"""Reconcile the channel's public uploads with WordPress Motion posts."""
+import argparse
+from datetime import datetime, timezone
 import html
-import json
 import os
 import re
 import sys
-import time
 
-import feedparser
 import requests
+
+from youtube_source import Video, get_channel_videos, get_video_metadata
 
 
 TARGETS = [
@@ -17,9 +19,13 @@ TARGETS = [
         "extract_title_tags": True,
     },
 ]
-
-FEED_RETRY_DELAYS = (5, 15, 30)
-FEED_TIMEOUT = (10, 30)
+POST_STATUSES = "publish,draft,private,future,pending"
+VIDEO_URL_PATTERN = re.compile(
+    r"(?:https?:)?//(?:www\.|m\.)?(?:"
+    r"youtube(?:-nocookie)?\.com/(?:watch\?[^\s\"'<>]*?v=|embed/|shorts/|live/)"
+    r"|youtu\.be/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])",
+    re.IGNORECASE,
+)
 
 
 def env(name: str) -> str:
@@ -29,30 +35,24 @@ def env(name: str) -> str:
     return value.rstrip("/") if name.endswith("URL") else value
 
 
-WP_BASE_URL = env("WP_BASE_URL")
-WP_USERNAME = env("WP_USERNAME")
-WP_APP_PASSWORD = env("WP_APP_PASSWORD")
-
-AUTH = (WP_USERNAME, WP_APP_PASSWORD)
-
-
 def wp_get(endpoint: str, params: dict | None = None):
     response = requests.get(
-        f"{WP_BASE_URL}/wp-json/wp/v2/{endpoint.lstrip('/')}",
+        f"{env('WP_BASE_URL')}/wp-json/wp/v2/{endpoint.lstrip('/')}",
         params=params,
-        auth=AUTH,
-        timeout=30,
+        auth=(env("WP_USERNAME"), env("WP_APP_PASSWORD")),
+        timeout=(10, 30),
     )
     response.raise_for_status()
     return response.json()
 
 
 def wp_post(endpoint: str, payload: dict):
+    # A timed-out write may already have succeeded; never replay a POST blindly.
     response = requests.post(
-        f"{WP_BASE_URL}/wp-json/wp/v2/{endpoint.lstrip('/')}",
+        f"{env('WP_BASE_URL')}/wp-json/wp/v2/{endpoint.lstrip('/')}",
         json=payload,
-        auth=AUTH,
-        timeout=30,
+        auth=(env("WP_USERNAME"), env("WP_APP_PASSWORD")),
+        timeout=(10, 30),
     )
     if not response.ok:
         print(response.status_code, response.text, file=sys.stderr)
@@ -62,11 +62,8 @@ def wp_post(endpoint: str, payload: dict):
 
 def get_channel_id(target: dict) -> str:
     channel_id = env(target["channel_id_env"])
-    if not channel_id.startswith("UC"):
-        raise RuntimeError(
-            f"{target['name']}: channel id must be the UC... id only, "
-            f"not a handle or URL. Current value starts with: {channel_id[:30]}"
-        )
+    if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id):
+        raise RuntimeError(f"{target['name']}: channel id must be the complete UC... ID")
     return channel_id
 
 
@@ -74,24 +71,13 @@ def get_category_id_by_slug(slug: str) -> int:
     items = wp_get("categories", {"slug": slug, "per_page": 100})
     if items:
         return int(items[0]["id"])
-
     raise RuntimeError(f"Category not found by slug: {slug}")
 
 
 def split_youtube_title_and_tags(raw_title: str) -> tuple[str, list[str]]:
     parts = raw_title.split("#")
-    title = parts[0].strip()
-
-    if not title:
-        title = raw_title.strip() or "YouTube"
-
-    tags: list[str] = []
-    for part in parts[1:]:
-        tag = part.strip()
-        if tag:
-            tags.append(tag)
-
-    return title, tags
+    title = parts[0].strip() or raw_title.strip() or "YouTube"
+    return title, list(dict.fromkeys(part.strip() for part in parts[1:] if part.strip()))
 
 
 def get_or_create_tag_id(name: str) -> int:
@@ -99,182 +85,60 @@ def get_or_create_tag_id(name: str) -> int:
     for item in items:
         if item.get("name", "").strip().lower() == name.strip().lower():
             return int(item["id"])
-
-    created = wp_post("tags", {"name": name})
-    return int(created["id"])
+    return int(wp_post("tags", {"name": name})["id"])
 
 
 def get_tag_ids(names: list[str]) -> list[int]:
     return [get_or_create_tag_id(name) for name in names]
 
 
-def renderers(node, name):
-    if isinstance(node, dict):
-        if name in node:
-            yield node[name]
-        for value in node.values():
-            yield from renderers(value, name)
-    elif isinstance(node, list):
-        for value in node:
-            yield from renderers(value, name)
-
-
-def youtube_text(value: dict) -> str:
-    return value.get("simpleText") or "".join(run.get("text", "") for run in value.get("runs", []))
-
-
-def parse_uploads_page(document: str, channel_id: str) -> tuple[str, str]:
-    """Read only the owner's uploads list, never recommendations elsewhere on the page."""
-    marker = re.search(r"var ytInitialData\s*=\s*", document)
-    if not marker:
-        raise ValueError("uploads page has no initial data")
-    data, _ = json.JSONDecoder().raw_decode(document[marker.end():])
-    headers = list(renderers(data.get("header", {}), "playlistHeaderRenderer"))
-    if len(headers) != 1:
-        raise ValueError("uploads page has no unique playlist header")
-    header = headers[0]
-    playlist_id = "UU" + channel_id[2:]
-    owner = header.get("ownerEndpoint", {}).get("browseEndpoint", {}).get("browseId")
-    if header.get("playlistId") != playlist_id or owner != channel_id:
-        raise RuntimeError("YouTube uploads playlist identity does not match the configured channel")
-
-    contents = data.get("contents", {})
-    lists = list(renderers(contents, "playlistVideoListRenderer")) + list(renderers(contents, "richGridRenderer"))
-    if len(lists) != 1:
-        raise ValueError("uploads page has no unique video list")
-    for item in lists[0].get("contents", []):
-        if "continuationItemRenderer" in item:
-            continue
-        card = item.get("richItemRenderer", {}).get("content", item)
-        if "playlistVideoRenderer" in card or "videoRenderer" in card:
-            video = card.get("playlistVideoRenderer", card.get("videoRenderer"))
-            if video.get("isPlayable") is False:
-                continue
-            video_id, title = video.get("videoId"), youtube_text(video.get("title", {}))
-        elif "shortsLockupViewModel" in card:
-            video = card["shortsLockupViewModel"]
-            video_id = video.get("onTap", {}).get("innertubeCommand", {}).get("reelWatchEndpoint", {}).get("videoId")
-            title = video.get("overlayMetadata", {}).get("primaryText", {}).get("content")
-        elif "lockupViewModel" in card:
-            video = card["lockupViewModel"]
-            if video.get("contentType") != "LOCKUP_CONTENT_TYPE_VIDEO":
-                raise ValueError("unexpected item in uploads list")
-            video_id = video.get("contentId")
-            title = video.get("metadata", {}).get("lockupMetadataViewModel", {}).get("title", {}).get("content")
-        else:
-            raise ValueError("unrecognized first uploads item; refusing to select an older video")
-        if not isinstance(video_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id) or not isinstance(title, str) or not title.strip():
-            raise ValueError("uploads item has no valid video ID or title")
-        return title, video_id
-    raise ValueError("uploads playlist contains no public videos")
-
-
-def get_latest_uploads_video(channel_id: str) -> tuple[str, str]:
-    response = requests.get(
-        "https://www.youtube.com/playlist?list=UU" + channel_id[2:] + "&hl=en",
-        headers={"User-Agent": "Mozilla/5.0 (compatible; fivsevn-youtube-sync/1.0)", "Accept": "text/html"},
-        timeout=FEED_TIMEOUT,
-    )
-    response.raise_for_status()
-    return parse_uploads_page(response.text, channel_id)
-
-
-def get_latest_youtube_video(channel_id: str, target_name: str) -> tuple[str, str]:
-    feed_url = (
-        "https://www.youtube.com/feeds/videos.xml"
-        f"?channel_id={channel_id}"
-    )
-
-    attempts = len(FEED_RETRY_DELAYS) + 1
-    reason = "no response"
-    for attempt in range(attempts):
-        try:
-            # Download explicitly: feedparser's URL fetch has no per-request timeout.
-            # Only this read is retried; a WordPress POST must never be replayed blindly.
-            response = requests.get(
-                feed_url,
-                headers={"User-Agent": "fivsevn-youtube-sync/1.0", "Accept": "application/atom+xml"},
-                timeout=FEED_TIMEOUT,
-            )
-        except requests.RequestException as error:
-            reason = f"network error ({type(error).__name__})"
-        else:
-            if response.status_code != 200:
-                reason = f"HTTP {response.status_code}"
-                if response.status_code not in {404, 408, 429} and not 500 <= response.status_code < 600:
-                    raise RuntimeError(f"{target_name}: YouTube feed returned {reason}")
-            else:
-                feed = feedparser.parse(response.content)
-                if feed.get("bozo") or not feed.get("version"):
-                    reason = "invalid feed document"
-                elif not feed.entries:
-                    reason = "feed contains no videos"
-                else:
-                    source_channel = feed.feed.get("yt_channelid")
-                    if source_channel and source_channel != channel_id:
-                        raise RuntimeError(f"{target_name}: YouTube feed belongs to another channel")
-                    latest = feed.entries[0]
-                    title = latest.get("title", "YouTube")
-                    video_id = latest.get("yt_videoid")
-                    if not video_id:
-                        match = re.search(r"(?:v=|/shorts/)([^?&/]+)", latest.get("link", ""))
-                        video_id = match.group(1) if match else None
-                    if video_id:
-                        print(f"Read latest YouTube video [{target_name}] on attempt {attempt + 1}/{attempts}.", flush=True)
-                        return title, video_id
-                    reason = "latest feed entry has no video ID"
-
-        # YouTube can keep returning 404 for both of its XML feed endpoints while
-        # the same channel's official public uploads playlist remains available.
-        print(f"YouTube feed [{target_name}]: {reason}; checking the official uploads page.", flush=True)
-        try:
-            title, video_id = get_latest_uploads_video(channel_id)
-        except (requests.RequestException, ValueError) as error:
-            reason += f"; uploads page unavailable ({type(error).__name__})"
-        else:
-            print(f"Read latest YouTube video [{target_name}] from the verified official uploads page on attempt {attempt + 1}/{attempts}.", flush=True)
-            return title, video_id
-
-        if attempt < len(FEED_RETRY_DELAYS):
-            delay = FEED_RETRY_DELAYS[attempt]
-            print(
-                f"YouTube feed [{target_name}]: {reason}; attempt {attempt + 1}/{attempts} "
-                f"failed, retrying in {delay}s.",
-                flush=True,
-            )
-            time.sleep(delay)
-
-    raise RuntimeError(f"{target_name}: could not read YouTube feed after {attempts} attempts ({reason})")
-
-
 def make_video_url(video_id: str) -> str:
-    # 统一转成普通 YouTube watch 链接。
-    # Shorts 原链接如：
-    # https://youtube.com/shorts/64mxEOPAHLc?si=...
-    # 会被写成：
-    # https://www.youtube.com/watch?v=64mxEOPAHLc
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
 def make_post_slug(video_id: str) -> str:
-    return f"youtube-{video_id}"
+    return f"youtube-{video_id}".lower()
+
+
+def video_ids_in_post(post: dict) -> set[str]:
+    content = post.get("content", {})
+    if isinstance(content, dict):
+        content = "\n".join(content.get(field, "") for field in ("raw", "rendered"))
+    # Raw Gutenberg attributes may escape slashes; rendered embeds encode '&'.
+    content = html.unescape(content.replace("\\/", "/"))
+    return set(VIDEO_URL_PATTERN.findall(content))
+
+
+def existing_video_index() -> tuple[set[str], set[str]]:
+    """Include unpublished posts, legacy slugs, and every WordPress result page."""
+    video_ids, slugs = set(), set()
+    page = 1
+    while True:
+        items = wp_get("posts", {
+            "context": "edit",
+            "status": POST_STATUSES,
+            "per_page": 100,
+            "offset": (page - 1) * 100,
+            "orderby": "id",
+            "order": "asc",
+            "_fields": "id,slug,content,status",
+        })
+        for item in items:
+            slugs.add(item.get("slug", "").lower())
+            video_ids.update(video_ids_in_post(item))
+        if len(items) < 100:
+            return video_ids, slugs
+        page += 1
+        # Offset returns [] past the last page, including exact multiples of 100.
 
 
 def post_already_exists(slug: str) -> bool:
-    items = wp_get(
-        "posts",
-        {
-            "slug": slug,
-            "status": "publish,draft,private,future,pending",
-            "per_page": 10,
-        },
-    )
-    return bool(items)
+    # Also protect posts moved out of Motion while retaining their stable slug.
+    return bool(wp_get("posts", {"slug": slug, "status": POST_STATUSES, "per_page": 10}))
 
 
 def make_youtube_embed_block(video_url: str) -> str:
     escaped_url = html.escape(video_url, quote=True)
-
     return f"""
 <!-- wp:embed {{"url":"{escaped_url}","type":"video","providerNameSlug":"youtube","responsive":false}} -->
 <figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube">
@@ -286,57 +150,77 @@ def make_youtube_embed_block(video_url: str) -> str:
 """.strip()
 
 
-def publish_latest_for_target(target: dict, category_cache: dict[str, int]) -> None:
-    target_name = target["name"]
-    category_slug = target["category_slug"]
+def publication_time(video: Video) -> datetime:
+    if not video.published_at or "T" not in video.published_at:
+        raise ValueError(f"{video.video_id}: missing exact YouTube publication time")
+    value = datetime.fromisoformat(video.published_at.replace("Z", "+00:00"))
+    if value.tzinfo is None:
+        raise ValueError(f"{video.video_id}: publication time has no timezone")
+    value = value.astimezone(timezone.utc)
+    if value > datetime.now(timezone.utc):
+        raise ValueError(f"{video.video_id}: video is scheduled in the future")
+    return value
+
+
+def build_publish_plan(target: dict) -> list[Video]:
     channel_id = get_channel_id(target)
+    videos = get_channel_videos(channel_id, target["name"])
+    existing_ids, slugs = existing_video_index()
+    missing = []
+    for video in videos:
+        if video.video_id in existing_ids or make_post_slug(video.video_id) in slugs:
+            continue
+        if post_already_exists(make_post_slug(video.video_id)):
+            continue
+        # Verify all missing metadata before the first write. Watch pages supply
+        # exact publication times for uploads that have aged out of the RSS feed.
+        if not video.published_at:
+            video = get_video_metadata(video.video_id, channel_id)
+        publication_time(video)
+        missing.append(video)
+        existing_ids.add(video.video_id)
+    # Python's stable sort preserves source order when timestamps are identical.
+    # Uploads are newest-first, so reverse first to publish oldest-first.
+    missing.reverse()
+    missing.sort(key=publication_time)
+    print(f"[{target['name']}] {len(videos)} public uploads; {len(missing)} missing posts.", flush=True)
+    return missing
 
-    raw_title, video_id = get_latest_youtube_video(channel_id, target_name)
 
-    if target.get("extract_title_tags"):
-        title, tag_names = split_youtube_title_and_tags(raw_title)
-    else:
-        title = raw_title
-        tag_names = []
-
-    video_url = make_video_url(video_id)
-    slug = make_post_slug(video_id)
-
-    if post_already_exists(slug):
-        print(f"Skip existing YouTube post [{target_name}]: {title} ({video_url})")
-        return
-
-    if category_slug not in category_cache:
-        category_cache[category_slug] = get_category_id_by_slug(category_slug)
-
-    category_id = category_cache[category_slug]
-    content = make_youtube_embed_block(video_url)
-
-    payload = {
-        "status": "publish",
-        "title": title,
-        "slug": slug,
-        "content": content,
-        "categories": [category_id],
-        "format": "video",
-    }
-
-    if tag_names:
-        payload["tags"] = get_tag_ids(tag_names)
-
-    post = wp_post("posts", payload)
-
-    print(
-        f"Published YouTube post [{target_name}]: "
-        f"{title} -> {post.get('link')} "
-        f"category={category_slug}"
-    )
+def publish_for_target(target: dict, *, dry_run: bool = False) -> None:
+    category_id = get_category_id_by_slug(target["category_slug"])
+    plan = build_publish_plan(target)
+    for video in plan:
+        timestamp = publication_time(video).strftime("%Y-%m-%dT%H:%M:%S")
+        print(f"{'Would publish' if dry_run else 'Publishing'} {timestamp}Z {video.video_id} {video.title}", flush=True)
+        if dry_run:
+            continue
+        # Recheck immediately before writing; a previous interrupted run or a
+        # manual publish may have created the same stable slug in the meantime.
+        if post_already_exists(make_post_slug(video.video_id)):
+            continue
+        title, tags = split_youtube_title_and_tags(video.title) if target.get("extract_title_tags") else (video.title, [])
+        payload = {
+            "status": "publish",
+            "title": title,
+            "slug": make_post_slug(video.video_id),
+            "date_gmt": timestamp,
+            "content": make_youtube_embed_block(make_video_url(video.video_id)),
+            "categories": [category_id],
+            "format": "video",
+        }
+        if tags:
+            payload["tags"] = get_tag_ids(tags)
+        post = wp_post("posts", payload)
+        print(f"Published {video.video_id} -> {post.get('link')}", flush=True)
 
 
 def main() -> None:
-    category_cache: dict[str, int] = {}
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dry-run", action="store_true", help="Read and print the ordered plan without writing posts or tags")
+    args = parser.parse_args()
     for target in TARGETS:
-        publish_latest_for_target(target, category_cache)
+        publish_for_target(target, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

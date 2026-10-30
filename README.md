@@ -31,7 +31,8 @@ fivsevn-assets/
 ├── docs/                        Saved shortcut file
 ├── scripts/
 │   ├── publish_image_posts.py
-│   └── publish_youtube_posts.py
+│   ├── publish_youtube_posts.py
+│   └── youtube_source.py
 ├── tests/                       Offline publishing checks
 └── .github/workflows/
     ├── publish-image-posts.yml
@@ -78,35 +79,27 @@ Deleting an asset does not delete a WordPress post. Edit or remove existing Bygo
 ---
 ## YouTube post automation
 
-- This repository includes a scheduled YouTube-to-WordPress automation for the `fivsevn` channel.
+This repository synchronizes public uploads from the `fivsevn` YouTube channel to WordPress. It scans the complete official uploads playlist, including continuation pages, so multiple uploads between runs and older missed videos can all be synchronized.
 
-- The automation is split into two files:
+The maintained files are [`.github/workflows/publish-youtube-posts.yml`](.github/workflows/publish-youtube-posts.yml), [`scripts/publish_youtube_posts.py`](scripts/publish_youtube_posts.py), and [`scripts/youtube_source.py`](scripts/youtube_source.py).
 
-```text
-.github/workflows/publish-youtube-posts.yml  
-scripts/publish_youtube_posts.py  
-```
+The workflow runs hourly (`0 * * * *`), supports manual runs from GitHub Actions, and runs when the publisher, its source reader, `tests/test_youtube_*.py`, or the workflow itself changes on `main`. These triggers share one concurrency group to prevent overlapping publishers. Each run has a 20-minute timeout, sets up Python 3.11, installs `requests` and `feedparser`, and runs the YouTube tests before publishing:
 
-- The workflow runs once every hour and can also be triggered manually from GitHub Actions.
-
-```text
-0 * * * *
-```
-
-- The workflow sets up Python 3.11, installs `requests` and `feedparser`, and then runs:
-
-```text
+```sh
+python -m unittest discover -s tests -p 'test_youtube_*.py' -v
 python scripts/publish_youtube_posts.py
 ```
 
-- The script reads the following GitHub Actions secrets / environment variables:
+The script reads these GitHub Actions secrets or environment variables:
 
 ```text
-WP_BASE_URL  
-WP_USERNAME  
-WP_APP_PASSWORD  
-YOUTUBE_FIVSEVN_CHANNEL_ID  
+WP_BASE_URL
+WP_USERNAME
+WP_APP_PASSWORD
+YOUTUBE_FIVSEVN_CHANNEL_ID
 ```
+
+`YOUTUBE_FIVSEVN_CHANNEL_ID` must contain the full `UC...` channel ID.
 
 ### current rules
 
@@ -116,38 +109,26 @@ YOUTUBE_FIVSEVN_CHANNEL_ID
 
 ### how it works
 
-Basic publishing flow:
+1. Read and verify the configured channel's complete official uploads playlist, following every continuation page.
+2. Read the YouTube RSS entries for titles and original publication timestamps. The feed's top-level channel ID may omit its `UC` prefix; both official forms are accepted for the configured channel.
+3. Read existing WordPress posts with `publish`, `draft`, `private`, `future`, and `pending` status. Match both the generated slug and embedded video IDs, including older articles with custom slugs. Existing drafts and other unpublished posts are preserved.
+4. For each missing video without complete RSS metadata, read its official watch page, verify its video ID and channel, and obtain the original publication timestamp.
+5. Finish reading and validating metadata for every missing video before creating any posts.
+6. Publish missing videos from oldest to newest, setting WordPress `date_gmt` to the original YouTube publication time in UTC. Use a stable `youtube-<lowercase-video-id>` slug, the `motion` category, `video` format, and one native WordPress YouTube embed block.
 
-1. Read the configured YouTube channel IDs from GitHub Actions secrets.
-2. Fetch each channel’s latest video from the YouTube RSS feed.
-3. Extract the video title and video ID.
-4. Normalize the video URL into a regular YouTube watch URL, like:
+To inspect the complete publishing plan without writing to WordPress, use the same environment variables and run:
 
-```text
-https://www.youtube.com/watch?v=VIDEO_ID  
+```sh
+python scripts/publish_youtube_posts.py --dry-run
 ```
-
-5. Generate a stable WordPress slug from the video ID, like:
-
-```text
-youtube-VIDEO_ID  
-```
-
-6. Skip publishing if a WordPress post with the same slug already exists.
-7. Resolve the target WordPress category by slug.
-8. Create a published WordPress post through the WordPress REST API.
-9. Insert the video as a native WordPress YouTube embed block.
 
 ### notes
 
-* The automation only publishes the latest video from the configured YouTube channel.
-* Duplicate publishing is prevented by checking whether a WordPress post with the generated YouTube slug already exists.
-* YouTube Shorts URLs are normalized into regular `watch?v=` URLs before being inserted into WordPress.
-* The video itself stays on YouTube; WordPress only stores the embed block.
-* `fivsevn` videos are published to the `motion` category.
-* Reads have a 10-second connection timeout and a 30-second read timeout. If RSS returns 404/408/429/5xx, a network error, malformed data, or no videos, the script checks the same channel's official public uploads playlist page. It verifies the playlist ID and owner before selecting the first public upload, supports Shorts and regular videos, and rejects unknown page layouts rather than choosing an older or unrelated video. No extra key or third-party mirror is used.
-* If both sources fail, reads are retried up to four rounds, with waits of 5, 15, and 30 seconds. Exhausted retries fail the run visibly; they are not treated as successful synchronization. The public-page fallback depends on YouTube's page structure; the offline tests cover the supported layouts.
-* Scheduled and manual YouTube runs are serialized to avoid concurrent duplicate posts. WordPress writes are not automatically retried. The hourly schedule, latest-video rule, category, title tags, and embed format are unchanged.
+* Multiple videos with the same title are distinct uploads and are matched by video ID.
+* Hashtags in YouTube titles become WordPress tags and are removed from the article title.
+* YouTube Shorts URLs are normalized into regular `watch?v=` URLs. The video stays on YouTube; WordPress stores the embed block.
+* YouTube page layouts and channel identity are validated. Incomplete reads or invalid metadata fail the run visibly before publishing; no extra API key or third-party mirror is used.
+* WordPress writes are not automatically retried. Later runs check existing video IDs and slugs again, so they can continue after a partially completed run without republishing successful posts.
 
 
 ---

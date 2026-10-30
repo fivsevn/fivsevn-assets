@@ -1,6 +1,14 @@
 name: Publish YouTube Posts
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/publish_youtube_posts.py"
+      - "scripts/youtube_source.py"
+      - "tests/test_youtube_*.py"
+      - ".github/workflows/publish-youtube-posts.yml"
   schedule:
     - cron: "0 * * * *"
   workflow_dispatch:
@@ -15,7 +23,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -29,8 +37,8 @@ jobs:
       - name: Install dependencies
         run: pip install requests feedparser
 
-      - name: Test YouTube feed recovery and publishing safeguards
-        run: python -m unittest discover -s tests -p 'test_youtube_posts.py' -v
+      - name: Test YouTube sources and publishing safeguards
+        run: python -m unittest discover -s tests -p 'test_youtube_*.py' -v
 
       - name: Publish YouTube posts
         env:
