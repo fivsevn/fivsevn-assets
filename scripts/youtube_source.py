@@ -1,6 +1,7 @@
 """Read a complete, verified public YouTube uploads catalogue and exact dates."""
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 import json
 import re
 import time
@@ -307,20 +308,78 @@ def get_channel_videos(channel_id: str, target_name: str) -> list[Video]:
     return result
 
 
-def get_video_metadata(video_id: str, channel_id: str) -> Video:
-    """Read a missing upload's exact original publication time from its watch page."""
-    _video("validate", video_id)
-    _, data = _read_page(
-        "https://www.youtube.com/watch", "ytInitialPlayerResponse", required_key="videoDetails",
-        params={"v": video_id, "hl": "en"},
-        headers={"User-Agent": USER_AGENT, "Accept": "text/html"},
-    )
-    details = data.get("videoDetails", {})
+
+class _WatchMeta(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.values = {}
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "meta":
+            key = attrs.get("itemprop") or attrs.get("property") or attrs.get("name")
+            if key in {"identifier", "datePublished", "og:title"}:
+                self.values.setdefault(key, []).append(attrs.get("content", ""))
+
+
+def _watch_html_metadata(document, video_id, channel_id):
+    """Use independent SEO and watch-page owner data when playback is limited."""
+    metadata = _WatchMeta()
+    metadata.feed(document)
+    values = {}
+    for key in ("identifier", "datePublished", "og:title"):
+        unique = set(metadata.values.get(key, []))
+        if len(unique) != 1 or not next(iter(unique)):
+            raise ValueError(f"YouTube watch page has no unique {key}")
+        values[key] = next(iter(unique))
+    page = _assigned_json(document, "ytInitialData")
+    current = page.get("currentVideoEndpoint", {}).get("watchEndpoint", {}).get("videoId")
+    if not current:
+        raise ValueError("YouTube watch page has no current video identity")
+    if current != video_id or values["identifier"] != video_id:
+        raise IdentityError(f"YouTube watch HTML does not match requested video {video_id}")
+    contents = page.get("contents", {}).get("twoColumnWatchNextResults", {}).get("results", {}).get("results", {}).get("contents", [])
+    owners = [item["videoSecondaryInfoRenderer"].get("owner", {}).get("videoOwnerRenderer", {}).get("navigationEndpoint", {}).get("browseEndpoint", {}).get("browseId")
+              for item in contents if "videoSecondaryInfoRenderer" in item]
+    if len(owners) != 1 or not owners[0]:
+        raise ValueError("YouTube watch page has no unique video owner")
+    if owners[0] != channel_id:
+        raise IdentityError(f"YouTube watch HTML for {video_id} belongs to another channel")
+    return _video(values["og:title"], video_id, _timestamp(values["datePublished"]))
+
+
+def _parse_watch_metadata(document, video_id, channel_id):
+    try:
+        data = _assigned_json(document, "ytInitialPlayerResponse")
+    except ValueError:
+        return _watch_html_metadata(document, video_id, channel_id)
+    details = data.get("videoDetails") or {}
     microformat = data.get("microformat", {}).get("playerMicroformatRenderer", {})
-    if details.get("videoId") != video_id or details.get("channelId") != channel_id:
-        raise IdentityError(f"YouTube watch metadata does not match requested video {video_id} and channel")
     if microformat.get("externalVideoId", video_id) != video_id or microformat.get("externalChannelId", channel_id) != channel_id:
         raise IdentityError("YouTube watch microformat belongs to another video or channel")
     if details.get("isPrivate") or microformat.get("isUnlisted"):
         raise ValueError("YouTube watch video is no longer public")
+    if not details:
+        return _watch_html_metadata(document, video_id, channel_id)
+    if details.get("videoId") != video_id or details.get("channelId") != channel_id:
+        raise IdentityError(f"YouTube watch metadata does not match requested video {video_id} and channel")
     return _video(details.get("title"), video_id, _timestamp(microformat.get("publishDate")))
+
+
+def get_video_metadata(video_id: str, channel_id: str) -> Video:
+    """Read a missing upload's verified original time, even if playback is limited."""
+    _video("validate", video_id)
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        response = _request(
+            "get", "https://www.youtube.com/watch", params={"v": video_id, "hl": "en"},
+            headers={"User-Agent": USER_AGENT, "Accept": "text/html"},
+        )
+        try:
+            return _parse_watch_metadata(response.text, video_id, channel_id)
+        except ValueError as error:
+            if attempt == len(RETRY_DELAYS):
+                raise
+            delay = RETRY_DELAYS[attempt]
+            print(f"YouTube watch metadata {video_id} unavailable ({error}); retrying in {delay}s.", flush=True)
+            time.sleep(delay)
+    raise RuntimeError("YouTube watch metadata exhausted retries")

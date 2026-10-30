@@ -234,6 +234,10 @@ class RssTests(unittest.TestCase):
 
 
 class WatchTests(unittest.TestCase):
+    def setUp(self):
+        patch.object(source.time, "sleep").start()
+        self.addCleanup(patch.stopall)
+
     def test_verified_watch_metadata_returns_exact_original_utc_time(self):
         with patch.object(source, "_request", return_value=response(watch())):
             result = source.get_video_metadata(FIRST, CHANNEL)
@@ -255,6 +259,44 @@ class WatchTests(unittest.TestCase):
     def test_unlisted_video_is_not_republished(self):
         with patch.object(source, "_request", return_value=response(watch(isUnlisted=True))), self.assertRaises(ValueError):
             source.get_video_metadata(FIRST, CHANNEL)
+
+
+class WatchHtmlFallbackTests(unittest.TestCase):
+    def setUp(self):
+        patch.object(source.time, "sleep").start()
+        self.addCleanup(patch.stopall)
+
+    def html(self, *, video_id=FIRST, channel=CHANNEL, current=FIRST, include_player=True):
+        page = {"currentVideoEndpoint": {"watchEndpoint": {"videoId": current}}, "contents": {
+            "twoColumnWatchNextResults": {"results": {"results": {"contents": [
+                {"videoSecondaryInfoRenderer": {"owner": {"videoOwnerRenderer": {
+                    "navigationEndpoint": {"browseEndpoint": {"browseId": channel}}}}}},
+            ]}}}}, "recommendations": {"channelId": OTHER_CHANNEL}}
+        player = '<script>var ytInitialPlayerResponse = {"playabilityStatus":{"status":"ERROR"}};</script>' if include_player else ''
+        return (f'<meta itemprop="identifier" content="{video_id}">'
+                '<meta itemprop="datePublished" content="2026-09-29T09:27:38-07:00">'
+                '<meta property="og:title" content="Old &amp; original">'
+                '<script>var ytInitialData = ' + json.dumps(page) + ';</script>' + player)
+
+    def test_limited_or_absent_player_keeps_exact_date_and_verified_owner(self):
+        for include_player in [True, False]:
+            with self.subTest(include_player=include_player), patch.object(source, '_request', return_value=response(self.html(include_player=include_player))):
+                result = source.get_video_metadata(FIRST, CHANNEL)
+            self.assertEqual(result, source.Video('Old & original', FIRST, '2026-09-29T16:27:38+00:00'))
+
+    def test_html_video_and_owner_mismatches_remain_hard_failures(self):
+        for options in [{'video_id': SECOND}, {'current': SECOND}, {'channel': OTHER_CHANNEL}]:
+            with self.subTest(options=options), patch.object(source, '_request', return_value=response(self.html(**options))) as request:
+                with self.assertRaises(source.IdentityError):
+                    source.get_video_metadata(FIRST, CHANNEL)
+                request.assert_called_once()
+
+    def test_partial_html_without_owner_or_exact_date_is_rejected(self):
+        for html in [self.html().replace('videoSecondaryInfoRenderer', 'unknownOwner'),
+                     self.html().replace('2026-09-29T09:27:38-07:00', '2026-09-29')]:
+            with self.subTest(html=html), patch.object(source, '_request', return_value=response(html)):
+                with self.assertRaises(ValueError):
+                    source.get_video_metadata(FIRST, CHANNEL)
 
 
 class RetryTests(unittest.TestCase):

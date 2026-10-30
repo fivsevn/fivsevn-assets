@@ -112,7 +112,7 @@ YOUTUBE_FIVSEVN_CHANNEL_ID
 1. Read and verify the configured channel's complete official uploads playlist, following every continuation page.
 2. Read the YouTube RSS entries for titles and original publication timestamps. The feed's top-level channel ID may omit its `UC` prefix; both official forms are accepted for the configured channel.
 3. Read existing WordPress posts with `publish`, `draft`, `private`, `future`, and `pending` status. Match both the generated slug and embedded video IDs, including older articles with custom slugs. Existing drafts and other unpublished posts are preserved.
-4. For each missing video without complete RSS metadata, read its official watch page, verify its video ID and channel, and obtain the original publication timestamp.
+4. For each missing video without complete RSS metadata, read its official watch page, verify its video ID and channel, and obtain the original publication timestamp. If playback metadata is unavailable, verify the page's SEO video identifier against its current video endpoint and the main content's owner channel before using its exact `datePublished` metadata.
 5. Finish reading and validating metadata for every missing video before creating any posts.
 6. Publish missing videos from oldest to newest, setting WordPress `date_gmt` to the original YouTube publication time in UTC. Use a stable `youtube-<lowercase-video-id>` slug, the `motion` category, `video` format, and one native WordPress YouTube embed block.
 
