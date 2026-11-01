@@ -1,3 +1,40 @@
+---
+id: assets-post-readme
+title: post
+
+module: assets
+submodule: guide
+topic: null
+
+type: note
+status: active
+canonical: true
+
+summary: null
+
+parents: []
+related: []
+
+tags: []
+
+audience:
+- self
+- internal
+languages:
+- zh
+
+maturity: evolving
+confidence: null
+
+visibility: public
+source_of_truth: assets
+
+filename_policy: entrypoint
+
+created: null
+updated: '2026-11-01'
+---
+
 # post
 
 本目录保存 `2025/`、`2026/` 等文章配图存档，不作为 Flux、Savour 或 Fieldlog 的发布入口。
